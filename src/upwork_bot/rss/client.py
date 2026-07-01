@@ -1,3 +1,4 @@
+import logging
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -5,6 +6,8 @@ from email.utils import parsedate_to_datetime
 from urllib.parse import parse_qs, unquote, urlparse
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -61,4 +64,15 @@ async def fetch_feed(url: str) -> list[RssJob]:
 
     root = ET.fromstring(response.text)
     items = root.findall(".//item")
-    return [_parse_item(item) for item in items]
+
+    jobs = []
+    for item in items:
+        try:
+            job = _parse_item(item)
+            jobs.append(job)
+        except (KeyError, ValueError, TypeError) as e:
+            link = item.findtext("link") or "(no link)"
+            logger.warning(f"Skipping malformed feed item: {e}. Link: {link}")
+            continue
+
+    return jobs
