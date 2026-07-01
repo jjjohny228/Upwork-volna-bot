@@ -30,3 +30,25 @@ async def insert_job_if_new(session: AsyncSession, feed_id: int, rss_job: RssJob
 async def get_active_feeds(session: AsyncSession):
     result = await session.execute(select(Feed).where(Feed.is_active.is_(True)))
     return list(result.scalars())
+
+
+async def add_feed(session: AsyncSession, url: str, label: str) -> Feed:
+    feed = Feed(url=url, label=label)
+    session.add(feed)
+    await session.commit()
+    await session.refresh(feed)
+    return feed
+
+
+async def remove_feed(session: AsyncSession, feed_id: int) -> bool:
+    feed = await session.get(Feed, feed_id)
+    if feed is None:
+        return False
+    await session.delete(feed)
+    await session.commit()
+    return True
+
+
+async def list_feeds(session: AsyncSession) -> list[Feed]:
+    result = await session.execute(select(Feed))
+    return list(result.scalars())
