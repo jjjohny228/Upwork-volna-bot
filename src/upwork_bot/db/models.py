@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ARRAY, ForeignKey, Text, UniqueConstraint, func
+from sqlalchemy import ARRAY, DateTime, ForeignKey, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from upwork_bot.db.base import Base
@@ -30,7 +30,7 @@ class Job(Base):
     description: Mapped[str] = mapped_column(Text)
     upwork_link: Mapped[str] = mapped_column(Text)
     categories: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
-    pub_date: Mapped[datetime | None] = mapped_column(nullable=True)
+    pub_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fit_score: Mapped[int | None] = mapped_column(nullable=True)
     fit_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     short_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
