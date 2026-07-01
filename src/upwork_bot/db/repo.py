@@ -1,10 +1,21 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from upwork_bot.db.models import Feed, Job, Resume
-from upwork_bot.llm.analysis_chain import JobFit
+from upwork_bot.db.models import (
+    Feed,
+    Job,
+    PortfolioProject,
+    Proposal,
+    ProposalExample,
+    Resume,
+)
 from upwork_bot.rss.client import RssJob
+
+if TYPE_CHECKING:
+    from upwork_bot.llm.analysis_chain import JobFit
 
 
 async def insert_job_if_new(session: AsyncSession, feed_id: int, rss_job: RssJob) -> Job | None:
@@ -61,10 +72,92 @@ async def get_active_resume(session: AsyncSession) -> str | None:
     return resume.content if resume else None
 
 
-async def save_job_analysis(session: AsyncSession, job_id: int, fit: JobFit) -> None:
+async def save_job_analysis(session: AsyncSession, job_id: int, fit: "JobFit") -> None:
     job = await session.get(Job, job_id)
     job.fit_score = fit.fit_score
     job.short_summary = fit.short_summary
     job.fit_reasoning = fit.reasoning
     job.status = "analyzed"
     await session.commit()
+
+
+async def upsert_resume(session: AsyncSession, content: str) -> None:
+    resume = Resume(content=content)
+    session.add(resume)
+    await session.commit()
+
+
+async def add_portfolio_project(
+    session: AsyncSession,
+    title: str,
+    description: str,
+    link: str | None,
+    embedding: list[float],
+) -> PortfolioProject:
+    project = PortfolioProject(title=title, description=description, link=link, embedding=embedding)
+    session.add(project)
+    await session.commit()
+    await session.refresh(project)
+    return project
+
+
+async def add_proposal_example(
+    session: AsyncSession, source_text: str, embedding: list[float]
+) -> ProposalExample:
+    example = ProposalExample(source_text=source_text, embedding=embedding)
+    session.add(example)
+    await session.commit()
+    await session.refresh(example)
+    return example
+
+
+async def search_similar_portfolio(
+    session: AsyncSession, embedding: list[float], top_k: int = 3
+) -> list[PortfolioProject]:
+    stmt = (
+        select(PortfolioProject)
+        .order_by(PortfolioProject.embedding.cosine_distance(embedding))
+        .limit(top_k)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars())
+
+
+async def search_similar_examples(
+    session: AsyncSession, embedding: list[float], top_k: int = 3
+) -> list[ProposalExample]:
+    stmt = (
+        select(ProposalExample)
+        .order_by(ProposalExample.embedding.cosine_distance(embedding))
+        .limit(top_k)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars())
+
+
+async def get_job(session: AsyncSession, job_id: int) -> Job | None:
+    return await session.get(Job, job_id)
+
+
+async def get_latest_proposal(session: AsyncSession, job_id: int) -> Proposal | None:
+    stmt = (
+        select(Proposal).where(Proposal.job_id == job_id).order_by(Proposal.version.desc()).limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.scalars().first()
+
+
+async def save_proposal(
+    session: AsyncSession,
+    job_id: int,
+    version: int,
+    content: str,
+    user_feedback: str | None = None,
+) -> Proposal:
+    proposal = Proposal(
+        job_id=job_id, version=version, content=content, user_feedback=user_feedback
+    )
+    session.add(proposal)
+    await session.commit()
+    await session.refresh(proposal)
+    return proposal
