@@ -2,7 +2,8 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from upwork_bot.db.models import Feed, Job
+from upwork_bot.db.models import Feed, Job, Resume
+from upwork_bot.llm.analysis_chain import JobFit
 from upwork_bot.rss.client import RssJob
 
 
@@ -52,3 +53,18 @@ async def remove_feed(session: AsyncSession, feed_id: int) -> bool:
 async def list_feeds(session: AsyncSession) -> list[Feed]:
     result = await session.execute(select(Feed))
     return list(result.scalars())
+
+
+async def get_active_resume(session: AsyncSession) -> str | None:
+    result = await session.execute(select(Resume).order_by(Resume.updated_at.desc()).limit(1))
+    resume = result.scalars().first()
+    return resume.content if resume else None
+
+
+async def save_job_analysis(session: AsyncSession, job_id: int, fit: JobFit) -> None:
+    job = await session.get(Job, job_id)
+    job.fit_score = fit.fit_score
+    job.short_summary = fit.short_summary
+    job.fit_reasoning = fit.reasoning
+    job.status = "analyzed"
+    await session.commit()
