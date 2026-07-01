@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "upwork-bot"
 version = "0.1.0"
@@ -32,3 +36,6 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/upwork_bot"]
