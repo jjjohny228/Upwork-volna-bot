@@ -24,6 +24,10 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    environment:
+      # Override the host-side .env value (localhost:5433) with the in-network
+      # address so the container reaches Postgres via the compose service name.
+      DATABASE_URL: postgresql+asyncpg://upwork:upwork@db:5432/upwork
 
 volumes:
   upwork_db_data:
