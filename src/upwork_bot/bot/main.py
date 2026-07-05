@@ -6,6 +6,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from upwork_bot.bot.handlers import (
     feeds,
     jobs,
+    menu,
     portfolio,
     proposal_examples,
     proposals,
@@ -29,6 +30,7 @@ def create_dispatcher() -> Dispatcher:
     dispatcher.include_router(proposal_examples.router)
     dispatcher.include_router(jobs.router)
     dispatcher.include_router(proposals.router)
+    dispatcher.include_router(menu.router)
 
     return dispatcher
 
