@@ -68,14 +68,14 @@ uv run ruff format --check .              # format check
 
 ## Bot commands
 
-| Command | Purpose |
+Send `/start` to open the admin menu — every action below is reachable from there (Feeds / Resume / Portfolio / Proposal examples), no command arguments needed:
+
+| Section | Actions |
 |---|---|
-| `/addfeed <rss_url> <label>` | register a Vollna RSS feed to poll |
-| `/removefeed <id>` | stop polling a feed |
-| `/listfeeds` | list configured feeds |
-| `/setresume <text>` (or upload `.pdf`/`.docx`) | set the resume used for fit analysis and proposal generation |
-| `/addproject <title> \| <description> \| <link>` | add a portfolio project (embedded for RAG retrieval) |
-| `/addexample <text>` | add a past proposal as a style/content reference (embedded for RAG retrieval) |
+| 📋 Feeds | List feeds (with ✖️ delete), Add feed (URL → label) |
+| 📄 Resume | View resume, Set resume (paste text or upload `.pdf`/`.docx`) |
+| 💼 Portfolio | List projects (with ✖️ delete), Add project (title → description → link or Skip) |
+| ✍️ Proposal examples | List examples (with ✖️ delete), Add example (paste text) |
 
 New job pushes include **📝 Generate proposal** / **🔗 Open job** buttons; generated proposals include a **🔄 Regenerate with edits** button — tap it, send a correction message, and get a revised draft.
 
