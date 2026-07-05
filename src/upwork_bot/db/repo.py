@@ -111,6 +111,34 @@ async def add_proposal_example(
     return example
 
 
+async def list_portfolio_projects(session: AsyncSession) -> list[PortfolioProject]:
+    result = await session.execute(select(PortfolioProject))
+    return list(result.scalars())
+
+
+async def remove_portfolio_project(session: AsyncSession, project_id: int) -> bool:
+    project = await session.get(PortfolioProject, project_id)
+    if project is None:
+        return False
+    await session.delete(project)
+    await session.commit()
+    return True
+
+
+async def list_proposal_examples(session: AsyncSession) -> list[ProposalExample]:
+    result = await session.execute(select(ProposalExample))
+    return list(result.scalars())
+
+
+async def remove_proposal_example(session: AsyncSession, example_id: int) -> bool:
+    example = await session.get(ProposalExample, example_id)
+    if example is None:
+        return False
+    await session.delete(example)
+    await session.commit()
+    return True
+
+
 async def search_similar_portfolio(
     session: AsyncSession, embedding: list[float], top_k: int = 3
 ) -> list[PortfolioProject]:
