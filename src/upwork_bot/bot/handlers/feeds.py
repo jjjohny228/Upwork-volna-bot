@@ -1,41 +1,25 @@
 from aiogram import Router
-from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
 
+from upwork_bot.bot.keyboards import (
+    BTN_ADD_FEED,
+    BTN_BACK,
+    BTN_CANCEL,
+    BTN_LIST_FEEDS,
+    cancel_kb,
+    delete_button_kb,
+    feeds_menu_kb,
+)
+from upwork_bot.bot.states import FeedStates
 from upwork_bot.db.base import AsyncSessionLocal
 from upwork_bot.db.repo import add_feed, list_feeds, remove_feed
 
 router = Router(name="feeds")
 
 
-@router.message(Command("addfeed"))
-async def cmd_addfeed(message: Message) -> None:
-    parts = (message.text or "").split(maxsplit=2)
-    if len(parts) < 3:
-        await message.answer("Usage: /addfeed <rss_url> <label>")
-        return
-
-    _, url, label = parts
-    async with AsyncSessionLocal() as session:
-        feed = await add_feed(session, url=url, label=label)
-    await message.answer(f"Added feed #{feed.id}: {feed.label}")
-
-
-@router.message(Command("removefeed"))
-async def cmd_removefeed(message: Message) -> None:
-    parts = (message.text or "").split(maxsplit=1)
-    if len(parts) < 2 or not parts[1].isdigit():
-        await message.answer("Usage: /removefeed <id>")
-        return
-
-    feed_id = int(parts[1])
-    async with AsyncSessionLocal() as session:
-        removed = await remove_feed(session, feed_id)
-    await message.answer(f"Removed feed #{feed_id}" if removed else "No such feed")
-
-
-@router.message(Command("listfeeds"))
-async def cmd_listfeeds(message: Message) -> None:
+@router.message(lambda m: m.text == BTN_LIST_FEEDS)
+async def cmd_list_feeds(message: Message) -> None:
     async with AsyncSessionLocal() as session:
         feeds = await list_feeds(session)
 
@@ -43,7 +27,51 @@ async def cmd_listfeeds(message: Message) -> None:
         await message.answer("No feeds configured.")
         return
 
-    lines = [
-        f"#{f.id} [{'active' if f.is_active else 'paused'}] {f.label} — {f.url}" for f in feeds
-    ]
-    await message.answer("\n".join(lines))
+    for feed in feeds:
+        status = "active" if feed.is_active else "paused"
+        await message.answer(
+            f"#{feed.id} [{status}] {feed.label} — {feed.url}",
+            reply_markup=delete_button_kb("delfeed", feed.id),
+        )
+
+
+@router.message(lambda m: m.text == BTN_ADD_FEED)
+async def start_add_feed(message: Message, state: FSMContext) -> None:
+    await state.set_state(FeedStates.waiting_for_url)
+    await message.answer("Send the RSS URL.", reply_markup=cancel_kb())
+
+
+@router.message(FeedStates.waiting_for_url)
+async def process_feed_url(message: Message, state: FSMContext) -> None:
+    if message.text in (BTN_BACK, BTN_CANCEL):
+        await state.clear()
+        await message.answer("Cancelled.", reply_markup=feeds_menu_kb())
+        return
+
+    await state.update_data(url=message.text)
+    await state.set_state(FeedStates.waiting_for_label)
+    await message.answer("Send a label for this feed.", reply_markup=cancel_kb())
+
+
+@router.message(FeedStates.waiting_for_label)
+async def process_feed_label(message: Message, state: FSMContext) -> None:
+    if message.text in (BTN_BACK, BTN_CANCEL):
+        await state.clear()
+        await message.answer("Cancelled.", reply_markup=feeds_menu_kb())
+        return
+
+    data = await state.get_data()
+    async with AsyncSessionLocal() as session:
+        feed = await add_feed(session, url=data["url"], label=message.text)
+    await state.clear()
+    await message.answer(f"Added feed #{feed.id}: {feed.label}", reply_markup=feeds_menu_kb())
+
+
+@router.callback_query(lambda c: c.data.startswith("delfeed:"))
+async def delete_feed_callback(callback: CallbackQuery) -> None:
+    feed_id = int(callback.data.split(":", 1)[1])
+    async with AsyncSessionLocal() as session:
+        removed = await remove_feed(session, feed_id)
+    await callback.answer("Deleted." if removed else "Not found.")
+    if removed:
+        await callback.message.edit_text(callback.message.text + "\n\n(deleted)")
