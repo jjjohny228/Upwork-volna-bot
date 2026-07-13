@@ -3,7 +3,7 @@ import io
 import docx2txt
 from aiogram import Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import BufferedInputFile, Message
 from pypdf import PdfReader
 
 from upwork_bot.bot.keyboards import (
@@ -16,7 +16,8 @@ from upwork_bot.bot.keyboards import (
 )
 from upwork_bot.bot.states import ResumeStates
 from upwork_bot.db.base import AsyncSessionLocal
-from upwork_bot.db.repo import get_active_resume, upsert_resume
+from upwork_bot.db.repo import get_active_resume, get_active_resume_pdf, upsert_resume
+from upwork_bot.pdf_utils import text_to_pdf
 
 router = Router(name="resume")
 
@@ -34,7 +35,22 @@ def _extract_text(filename: str, data: bytes) -> str:
 async def view_resume(message: Message) -> None:
     async with AsyncSessionLocal() as session:
         content = await get_active_resume(session)
-    await message.answer(content or "No resume set yet.")
+        pdf_bytes = await get_active_resume_pdf(session)
+
+    if not content and not pdf_bytes:
+        await message.answer("No resume set yet.")
+        return
+
+    if pdf_bytes:
+        await message.answer_document(
+            BufferedInputFile(pdf_bytes, filename="resume.pdf"),
+            caption="Current resume",
+        )
+        return
+
+    # Legacy resume stored before PDF support: send text in Telegram-safe chunks.
+    for start in range(0, len(content), 4000):
+        await message.answer(content[start : start + 4000])
 
 
 @router.message(lambda m: m.text == BTN_SET_RESUME)
@@ -58,14 +74,18 @@ async def process_resume_content(message: Message, state: FSMContext) -> None:
             return
         file = await message.bot.get_file(message.document.file_id)
         buffer = await message.bot.download_file(file.file_path)
-        content = _extract_text(message.document.file_name, buffer.read())
+        data = buffer.read()
+        content = _extract_text(message.document.file_name, data)
+        # Keep the uploaded PDF as-is; render one for docx uploads.
+        pdf_bytes = data if message.document.file_name.endswith(".pdf") else text_to_pdf(content)
     elif message.text:
         content = message.text
+        pdf_bytes = text_to_pdf(content)
     else:
         await message.answer("Send text or upload a .pdf/.docx file.")
         return
 
     async with AsyncSessionLocal() as session:
-        await upsert_resume(session, content=content)
+        await upsert_resume(session, content=content, pdf_bytes=pdf_bytes)
     await state.clear()
     await message.answer("Resume updated.", reply_markup=resume_menu_kb())

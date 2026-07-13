@@ -5,13 +5,14 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 
-BTN_FEEDS = "📋 Feeds"
 BTN_RESUME = "📄 Resume"
 BTN_PORTFOLIO = "💼 Portfolio"
 BTN_EXAMPLES = "✍️ Proposal examples"
+BTN_WRITE_PROPOSAL = "🖊 Write proposal"
+BTN_SETTINGS = "⚙️ Settings"
 
-BTN_LIST_FEEDS = "📃 List feeds"
-BTN_ADD_FEED = "➕ Add feed"
+BTN_DELIVERY_ALL = "📬 Send all jobs"
+BTN_DELIVERY_QUALIFIED = "✅ Send only qualified"
 
 BTN_VIEW_RESUME = "👁 View resume"
 BTN_SET_RESUME = "✏️ Set resume"
@@ -30,17 +31,22 @@ BTN_SKIP_LINK = "⏭️ Skip"
 def main_menu_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_FEEDS), KeyboardButton(text=BTN_RESUME)],
-            [KeyboardButton(text=BTN_PORTFOLIO), KeyboardButton(text=BTN_EXAMPLES)],
+            [KeyboardButton(text=BTN_RESUME), KeyboardButton(text=BTN_PORTFOLIO)],
+            [KeyboardButton(text=BTN_EXAMPLES), KeyboardButton(text=BTN_WRITE_PROPOSAL)],
+            [KeyboardButton(text=BTN_SETTINGS)],
         ],
         resize_keyboard=True,
     )
 
 
-def feeds_menu_kb() -> ReplyKeyboardMarkup:
+def settings_menu_kb(notify_qualified_only: bool) -> ReplyKeyboardMarkup:
+    """Delivery-mode picker; the current mode is marked with a dot."""
+    all_label = BTN_DELIVERY_ALL + ("" if notify_qualified_only else "  •")
+    qualified_label = BTN_DELIVERY_QUALIFIED + ("  •" if notify_qualified_only else "")
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_LIST_FEEDS), KeyboardButton(text=BTN_ADD_FEED)],
+            [KeyboardButton(text=all_label)],
+            [KeyboardButton(text=qualified_label)],
             [KeyboardButton(text=BTN_BACK)],
         ],
         resize_keyboard=True,

@@ -2,33 +2,38 @@ import pytest
 from sqlalchemy import select
 
 from upwork_bot.db.base import AsyncSessionLocal
-from upwork_bot.db.models import Feed, Job, PortfolioProject, ProposalExample
+from upwork_bot.db.models import Job, PortfolioProject, ProposalExample
 from upwork_bot.db.repo import (
+    add_user,
+    delete_user,
+    get_or_create_admin_user,
+    get_user_by_telegram_id,
     insert_job_if_new,
     list_portfolio_projects,
     list_proposal_examples,
+    list_users,
     remove_portfolio_project,
     remove_proposal_example,
+    set_active,
+    set_notify_qualified_only,
 )
-from upwork_bot.rss.client import RssJob
+from upwork_bot.gmail.client import JobEmail
 
 
 @pytest.mark.asyncio
 async def test_insert_job_if_new_dedupes_by_pid():
     async with AsyncSessionLocal() as session:
-        feed = Feed(url="https://vollna.com/rss/dedup-test", label="dedup-test")
-        session.add(feed)
-        await session.commit()
-
-        rss_job = RssJob(
+        admin = await get_or_create_admin_user(session, 617073201)
+        job_email = JobEmail(
             external_pid="dedup-pid-1",
             title="t",
             description="d",
-            upwork_link="https://upwork.com/jobs/~1",
+            upwork_link="https://www.upwork.com/jobs/~1",
+            rate="Hourly Rate: 10 - 20 USD",
         )
 
-        first = await insert_job_if_new(session, feed.id, rss_job)
-        second = await insert_job_if_new(session, feed.id, rss_job)
+        first = await insert_job_if_new(session, job_email, admin.id)
+        second = await insert_job_if_new(session, job_email, admin.id)
 
         assert first is not None
         assert second is None
@@ -38,8 +43,66 @@ async def test_insert_job_if_new_dedupes_by_pid():
         assert len(rows) == 1
 
         await session.delete(rows[0])
-        await session.delete(feed)
         await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_same_pid_two_users_makes_two_jobs():
+    async with AsyncSessionLocal() as session:
+        admin = await get_or_create_admin_user(session, 617073201)
+        other = await add_user(session, telegram_id=999_000_111, display_name="other")
+        job_email = JobEmail(
+            external_pid="shared-pid-1",
+            title="t",
+            description="d",
+            upwork_link="https://www.upwork.com/jobs/~9",
+        )
+
+        a = await insert_job_if_new(session, job_email, admin.id)
+        b = await insert_job_if_new(session, job_email, other.id)
+
+        assert a is not None and b is not None
+        assert a.id != b.id
+
+        result = await session.execute(select(Job).where(Job.external_pid == "shared-pid-1"))
+        rows = list(result.scalars())
+        assert len(rows) == 2
+
+        for row in rows:
+            await session.delete(row)
+        await session.commit()
+        await delete_user(session, 999_000_111)
+
+
+@pytest.mark.asyncio
+async def test_user_crud_and_toggle():
+    tid = 999_000_222
+    async with AsyncSessionLocal() as session:
+        await delete_user(session, tid)  # ensure clean slate
+
+        created = await add_user(session, telegram_id=tid, display_name="crud")
+        assert created.telegram_id == tid
+        assert created.is_active is True
+        assert created.notify_qualified_only is False
+
+        fetched = await get_user_by_telegram_id(session, tid)
+        assert fetched is not None and fetched.id == created.id
+        assert any(u.telegram_id == tid for u in await list_users(session))
+
+        # add_user is idempotent + reactivates.
+        assert await set_active(session, tid, False) is True
+        again = await add_user(session, telegram_id=tid, display_name="crud")
+        assert again.id == created.id
+        assert again.is_active is True
+
+        assert await set_notify_qualified_only(session, tid, True) is True
+        toggled = await get_user_by_telegram_id(session, tid)
+        assert toggled.notify_qualified_only is True
+
+        assert await delete_user(session, tid) is True
+        assert await get_user_by_telegram_id(session, tid) is None
+        assert await set_active(session, tid, True) is False
+        assert await set_notify_qualified_only(session, tid, True) is False
 
 
 @pytest.mark.asyncio

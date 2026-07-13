@@ -1,17 +1,18 @@
 from upwork_bot.bot.keyboards import (
-    BTN_ADD_FEED,
     BTN_BACK,
     BTN_CANCEL,
+    BTN_DELIVERY_ALL,
+    BTN_DELIVERY_QUALIFIED,
     BTN_EXAMPLES,
-    BTN_FEEDS,
-    BTN_LIST_FEEDS,
     BTN_PORTFOLIO,
     BTN_RESUME,
+    BTN_SETTINGS,
     BTN_SKIP_LINK,
+    BTN_WRITE_PROPOSAL,
     cancel_kb,
     delete_button_kb,
-    feeds_menu_kb,
     main_menu_kb,
+    settings_menu_kb,
     skip_link_kb,
 )
 
@@ -20,14 +21,26 @@ def _flatten(keyboard) -> list[str]:
     return [button.text for row in keyboard.keyboard for button in row]
 
 
-def test_main_menu_has_all_four_sections():
+def test_main_menu_has_all_sections():
     labels = _flatten(main_menu_kb())
-    assert set(labels) == {BTN_FEEDS, BTN_RESUME, BTN_PORTFOLIO, BTN_EXAMPLES}
+    assert set(labels) == {
+        BTN_RESUME,
+        BTN_PORTFOLIO,
+        BTN_EXAMPLES,
+        BTN_WRITE_PROPOSAL,
+        BTN_SETTINGS,
+    }
 
 
-def test_feeds_menu_has_list_add_back():
-    labels = _flatten(feeds_menu_kb())
-    assert set(labels) == {BTN_LIST_FEEDS, BTN_ADD_FEED, BTN_BACK}
+def test_settings_menu_marks_current_mode():
+    all_labels = _flatten(settings_menu_kb(notify_qualified_only=False))
+    assert any(lbl.startswith(BTN_DELIVERY_ALL) and lbl.endswith("•") for lbl in all_labels)
+    assert BTN_BACK in all_labels
+
+    qualified_labels = _flatten(settings_menu_kb(notify_qualified_only=True))
+    assert any(
+        lbl.startswith(BTN_DELIVERY_QUALIFIED) and lbl.endswith("•") for lbl in qualified_labels
+    )
 
 
 def test_cancel_kb_has_only_cancel():

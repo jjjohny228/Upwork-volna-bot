@@ -5,7 +5,13 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 
 
-class OwnerOnlyMiddleware(BaseMiddleware):
+class AdminOnlyMiddleware(BaseMiddleware):
+    """Restrict a router to the single admin (``ADMIN_TELEGRAM_ID``).
+
+    Attach to admin-panel routers only; ordinary handlers use
+    ``RegisteredUserMiddleware`` instead.
+    """
+
     def __init__(self, admin_telegram_id: int) -> None:
         self.admin_telegram_id = admin_telegram_id
 
@@ -15,7 +21,7 @@ class OwnerOnlyMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        user = data.get("event_from_user") or getattr(event, "from_user", None)
-        if user is None or user.id != self.admin_telegram_id:
+        tg_user = data.get("event_from_user") or getattr(event, "from_user", None)
+        if tg_user is None or tg_user.id != self.admin_telegram_id:
             return None
         return await handler(event, data)

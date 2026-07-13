@@ -1,0 +1,12 @@
+.git
+.gitignore
+.next
+.idea
+.vscode
+node_modules
+npm-debug.log*
+public/uploads
+tasks
+docs
+*.md
+.env*

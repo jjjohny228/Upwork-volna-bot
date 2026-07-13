@@ -7,12 +7,13 @@ from upwork_bot.db.models import Job
 from upwork_bot.db.repo import (
     get_active_resume,
     get_job,
+    get_user,
     save_proposal,
     search_similar_examples,
     search_similar_portfolio,
 )
 from upwork_bot.llm.embeddings import embed_text
-from upwork_bot.llm.proposal_chain import generate_proposal
+from upwork_bot.llm.proposal_chain import generate_proposal, portfolio_snippet
 
 router = Router(name="jobs")
 
@@ -45,16 +46,35 @@ def _regenerate_keyboard(job_id: int) -> InlineKeyboardMarkup:
 
 async def notify_new_job(bot: Bot, job: Job) -> None:
     settings = get_settings()
-    text = (
-        f"<b>{job.title}</b>\n\n"
-        f"Fit score: {job.fit_score}/100\n"
-        f"{job.short_summary}\n\n"
-        f"<i>{job.fit_reasoning}</i>"
-    )
+
+    # Resolve the owning user to honour their delivery mode + destination chat.
+    chat_id = settings.admin_telegram_id
+    if job.user_id is not None:
+        async with AsyncSessionLocal() as session:
+            owner = await get_user(session, job.user_id)
+        if owner is not None:
+            chat_id = owner.telegram_id
+            # Qualified-only mode: drop disqualified jobs silently.
+            if owner.notify_qualified_only and not job.qualified:
+                return
+
+    lines = [f"<b>{job.title}</b>", ""]
+    if job.rate:
+        lines.append(f"{job.rate}")
+    lines.append(f"Qualifier: {'✅ Qualified' if job.qualified else '❌ Disqualified'}")
+    if job.short_summary:
+        lines.append("")
+        lines.append(f"{job.short_summary}")
+    if job.fit_reasoning:
+        lines.append("")
+        lines.append(f"<i>{job.fit_reasoning}</i>")
+    text = "\n".join(lines)
+    # Qualified jobs ping loudly; disqualified ones arrive silently.
     await bot.send_message(
-        chat_id=settings.admin_telegram_id,
+        chat_id=chat_id,
         text=text,
         reply_markup=_job_keyboard(job.id, job.upwork_link),
+        disable_notification=not job.qualified,
     )
 
 
@@ -74,10 +94,12 @@ async def handle_generate_proposal(callback: CallbackQuery) -> None:
             resume_text=resume_text,
             job_title=job.title,
             job_description=job.description,
-            portfolio_snippets=[f"{p.title}: {p.description}" for p in portfolio],
+            portfolio_snippets=[portfolio_snippet(p) for p in portfolio],
             example_snippets=[e.source_text for e in examples],
         )
 
         await save_proposal(session, job_id=job.id, version=1, content=content)
 
-    await callback.message.answer(content, reply_markup=_regenerate_keyboard(job_id))
+    await callback.message.reply(
+        content, reply_markup=_regenerate_keyboard(job_id), parse_mode=None
+    )
