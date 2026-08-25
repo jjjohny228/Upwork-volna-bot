@@ -12,7 +12,13 @@ from upwork_bot.bot.handlers.quiet_hours import (
     toggle_quiet_hours,
 )
 from upwork_bot.db.base import AsyncSessionLocal
-from upwork_bot.db.repo import add_user, delete_user, get_user_by_telegram_id, set_timezone
+from upwork_bot.db.repo import (
+    add_user,
+    delete_user,
+    get_user_by_telegram_id,
+    set_quiet_window,
+    set_timezone,
+)
 
 
 def _msg(text: str) -> Message:
@@ -48,6 +54,9 @@ async def test_enable_with_timezone_succeeds():
         user = await add_user(session, telegram_id=558501, display_name="qh2")
         await set_timezone(session, 558501, "UTC")
         user.timezone = "UTC"
+        await set_quiet_window(session, 558501, _dt.time(23, 0), _dt.time(7, 0))
+        user.quiet_start = _dt.time(23, 0)
+        user.quiet_end = _dt.time(7, 0)
     state = AsyncMock(spec=FSMContext)
     try:
         with patch.object(Message, "answer", new_callable=AsyncMock):
@@ -58,6 +67,25 @@ async def test_enable_with_timezone_succeeds():
     finally:
         async with AsyncSessionLocal() as session:
             await delete_user(session, telegram_id=558501)
+
+
+@pytest.mark.asyncio
+async def test_enable_blocked_without_window():
+    async with AsyncSessionLocal() as session:
+        user = await add_user(session, telegram_id=558504, display_name="qh5")
+        await set_timezone(session, 558504, "UTC")
+        user.timezone = "UTC"
+    state = AsyncMock(spec=FSMContext)
+    try:
+        with patch.object(Message, "answer", new_callable=AsyncMock):
+            await toggle_quiet_hours(_msg("🔔 Enable quiet hours"), state, user)
+        # Timezone set but no window -> refuse to enable.
+        assert user.quiet_hours_enabled is False
+        async with AsyncSessionLocal() as session:
+            assert (await get_user_by_telegram_id(session, 558504)).quiet_hours_enabled is False
+    finally:
+        async with AsyncSessionLocal() as session:
+            await delete_user(session, telegram_id=558504)
 
 
 @pytest.mark.asyncio

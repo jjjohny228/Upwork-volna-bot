@@ -59,6 +59,12 @@ async def toggle_quiet_hours(message: Message, state: FSMContext, user: User) ->
             reply_markup=quiet_hours_menu_kb(user.quiet_hours_enabled),
         )
         return
+    if enabling and not (user.quiet_start and user.quiet_end):
+        await message.answer(
+            "Set a window first (🕐 Set window) before enabling quiet hours.",
+            reply_markup=quiet_hours_menu_kb(user.quiet_hours_enabled),
+        )
+        return
     async with AsyncSessionLocal() as session:
         await set_quiet_hours_enabled(session, user.telegram_id, enabling)
     user.quiet_hours_enabled = enabling

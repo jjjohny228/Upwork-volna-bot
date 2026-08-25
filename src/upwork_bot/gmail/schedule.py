@@ -12,6 +12,11 @@ from upwork_bot.db.models import User
 
 
 def is_parsing_allowed(user: User, now_utc: datetime) -> bool:
+    """Return whether the poller may parse this user's mailboxes right now.
+
+    `now_utc` must be a timezone-aware UTC datetime — a naive value would make
+    `.astimezone` assume system-local time and corrupt the window check.
+    """
     if not user.parsing_active:
         return False
     if not (user.quiet_hours_enabled and user.timezone and user.quiet_start and user.quiet_end):

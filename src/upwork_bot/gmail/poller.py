@@ -50,6 +50,10 @@ async def poll_once(on_new_job: OnNewJob, since: datetime | None = None) -> int:
             # Parsing suspended for this owner: advance the watermark without
             # fetching so mail that arrived while suspended is later dropped by
             # the `since` cutoff (never parsed, never delivered).
+            # Note: the cursor only advances on a suppressed poll, so an email that
+            # arrives in the last interval before the window ends can still be
+            # delivered on the first allowed poll afterward, bounded by
+            # POLL_INTERVAL_SECONDS — expected, not a bug.
             async with AsyncSessionLocal() as session:
                 await set_mailbox_cursor(session, mb.id, poll_start.isoformat())
             continue
