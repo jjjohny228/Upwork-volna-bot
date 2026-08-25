@@ -1,5 +1,5 @@
 #!/bin/sh
-# Apply any pending DB migrations, then launch the bot. Running this on every
+# Apply any pending DB migrations, then launch the bot.
 set -e
 
 uv run alembic upgrade head
