@@ -53,5 +53,5 @@ async def show_setup(message: Message, state: FSMContext, user: User) -> None:
     )
     await message.answer(
         f"<b>Your setup</b>\n{checklist}\n\n{_HOWTO}",
-        reply_markup=main_menu_kb(),
+        reply_markup=main_menu_kb(user.parsing_active),
     )
