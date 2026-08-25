@@ -40,13 +40,43 @@ BTN_BACK = "⬅️ Back"
 BTN_CANCEL = "❌ Cancel"
 BTN_SKIP_LINK = "⏭️ Skip"
 
+BTN_START_PARSING = "▶️ Start parsing"
+BTN_PAUSE_PARSING = "⏸ Pause parsing"
 
-def main_menu_kb() -> ReplyKeyboardMarkup:
+BTN_QUIET_HOURS = "🌙 Quiet hours"
+BTN_TIMEZONE = "🕒 Timezone"
+
+BTN_QUIET_TOGGLE_ON = "🔔 Enable quiet hours"
+BTN_QUIET_TOGGLE_OFF = "🔕 Disable quiet hours"
+BTN_QUIET_SET_WINDOW = "🕐 Set window"
+
+BTN_TZ_MANUAL = "✍️ Enter manually"
+
+COMMON_TIMEZONES = [
+    "Europe/Kyiv",
+    "Europe/London",
+    "Europe/Berlin",
+    "Europe/Moscow",
+    "America/New_York",
+    "America/Chicago",
+    "America/Los_Angeles",
+    "Asia/Dubai",
+    "Asia/Kolkata",
+    "Asia/Singapore",
+    "Asia/Tokyo",
+    "Australia/Sydney",
+    "UTC",
+]
+
+
+def main_menu_kb(parsing_active: bool = True) -> ReplyKeyboardMarkup:
+    toggle = BTN_PAUSE_PARSING if parsing_active else BTN_START_PARSING
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BTN_RESUME), KeyboardButton(text=BTN_PORTFOLIO)],
             [KeyboardButton(text=BTN_EXAMPLES), KeyboardButton(text=BTN_WRITE_PROPOSAL)],
             [KeyboardButton(text=BTN_SETTINGS), KeyboardButton(text=BTN_SETUP)],
+            [KeyboardButton(text=toggle)],
         ],
         resize_keyboard=True,
     )
@@ -60,8 +90,21 @@ def settings_menu_kb(notify_qualified_only: bool) -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text=BTN_MAILBOXES), KeyboardButton(text=BTN_QUALIFY_PROMPT)],
             [KeyboardButton(text=BTN_HOURLY_RATE), KeyboardButton(text=BTN_SIGNATURE)],
+            [KeyboardButton(text=BTN_QUIET_HOURS), KeyboardButton(text=BTN_TIMEZONE)],
             [KeyboardButton(text=all_label)],
             [KeyboardButton(text=qualified_label)],
+            [KeyboardButton(text=BTN_BACK)],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def quiet_hours_menu_kb(enabled: bool) -> ReplyKeyboardMarkup:
+    toggle = BTN_QUIET_TOGGLE_OFF if enabled else BTN_QUIET_TOGGLE_ON
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=toggle)],
+            [KeyboardButton(text=BTN_QUIET_SET_WINDOW), KeyboardButton(text=BTN_TIMEZONE)],
             [KeyboardButton(text=BTN_BACK)],
         ],
         resize_keyboard=True,
@@ -133,6 +176,12 @@ def skip_link_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text=BTN_SKIP_LINK, callback_data="skip_link")]]
     )
+
+
+def timezone_inline_kb() -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(text=tz, callback_data=f"tz:{tz}")] for tz in COMMON_TIMEZONES]
+    rows.append([InlineKeyboardButton(text=BTN_TZ_MANUAL, callback_data="tz_manual")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def skip_folder_kb() -> InlineKeyboardMarkup:

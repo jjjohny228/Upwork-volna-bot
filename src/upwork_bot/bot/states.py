@@ -36,3 +36,12 @@ class SignatureStates(StatesGroup):
 
 class QualifyPromptStates(StatesGroup):
     waiting_for_prompt = State()
+
+
+class TimezoneStates(StatesGroup):
+    waiting_for_manual = State()
+
+
+class QuietHoursStates(StatesGroup):
+    waiting_for_start = State()
+    waiting_for_end = State()
