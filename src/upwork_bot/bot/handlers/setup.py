@@ -25,6 +25,8 @@ _HOWTO = (
     "5. ⚙️ Settings → 🎯 Qualify prompt → ✨ Generate prompt (needs a resume + a project).\n"
     "6. ⚙️ Settings → 💲 Hourly rate and ✒️ Signature for proposal drafts.\n"
     "7. ⚙️ Settings → choose whether to receive all jobs or only qualified ones."
+    "\n8. ⚙️ Settings → 🕒 Timezone, then 🌙 Quiet hours to pause parsing overnight. "
+    "Use ▶️/⏸ on the main menu to start or pause parsing anytime."
 )
 
 
