@@ -127,3 +127,39 @@ async def test_poll_once_assigns_jobs_per_mailbox_owner():
         async with AsyncSessionLocal() as session:
             await delete_user(session, telegram_id=556002)
             await delete_user(session, telegram_id=556003)
+
+
+@pytest.mark.asyncio
+async def test_poll_once_skips_paused_owner_and_advances_cursor():
+    from upwork_bot.db.repo import set_parsing_active
+
+    async with AsyncSessionLocal() as session:
+        user = await add_user(session, telegram_id=556005, display_name="paused")
+        await add_mailbox(session, user.id, address="paused@x.com", app_password="p")
+        await set_parsing_active(session, 556005, False)
+
+    fetched: list[str] = []
+    seen: list[int] = []
+
+    def fake_fetch(address, *args, **kwargs):
+        fetched.append(address)
+        return [_job_email("paused-pid")] if address == "paused@x.com" else []
+
+    async def on_new_job(job: Job) -> None:
+        seen.append(job.id)
+
+    try:
+        with patch("upwork_bot.gmail.poller.fetch_new_job_emails", side_effect=fake_fetch):
+            count = await poll_once(on_new_job)
+
+        assert "paused@x.com" not in fetched  # never contacted IMAP
+        assert seen == []  # nothing delivered
+        assert count == 0
+        async with AsyncSessionLocal() as session:
+            mb = (
+                await session.execute(select(Mailbox).where(Mailbox.user_id == user.id))
+            ).scalar_one()
+            assert mb.cursor is not None  # cursor advanced -> drops backlog
+    finally:
+        async with AsyncSessionLocal() as session:
+            await delete_user(session, telegram_id=556005)

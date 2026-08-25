@@ -6,8 +6,14 @@ from datetime import UTC, datetime
 from upwork_bot.config import get_settings
 from upwork_bot.db.base import AsyncSessionLocal
 from upwork_bot.db.models import Job
-from upwork_bot.db.repo import insert_job_if_new, list_active_mailboxes, set_mailbox_cursor
+from upwork_bot.db.repo import (
+    insert_job_if_new,
+    list_active_mailboxes,
+    list_users,
+    set_mailbox_cursor,
+)
 from upwork_bot.gmail.client import fetch_new_job_emails
+from upwork_bot.gmail.schedule import is_parsing_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +40,23 @@ async def poll_once(on_new_job: OnNewJob, since: datetime | None = None) -> int:
 
     async with AsyncSessionLocal() as session:
         mailboxes = await list_active_mailboxes(session)
+        owners = {u.id: u for u in await list_users(session)}
 
     new_count = 0
     for mb in mailboxes:
+        poll_start = datetime.now(tz=UTC)
+        owner = owners.get(mb.user_id)
+        if owner is None or not is_parsing_allowed(owner, poll_start):
+            # Parsing suspended for this owner: advance the watermark without
+            # fetching so mail that arrived while suspended is later dropped by
+            # the `since` cutoff (never parsed, never delivered).
+            async with AsyncSessionLocal() as session:
+                await set_mailbox_cursor(session, mb.id, poll_start.isoformat())
+            continue
+
         # A stale cursor from a previous run never drags the poll below the
         # startup watermark — each restart ignores the accumulated backlog.
         mb_since = max(_parse_cursor(mb.cursor, fallback), fallback)
-        poll_start = datetime.now(tz=UTC)
         try:
             job_emails = await asyncio.to_thread(
                 fetch_new_job_emails,
