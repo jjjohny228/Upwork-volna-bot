@@ -8,7 +8,7 @@ from aiogram.types import Chat, Message, User
 
 from upwork_bot.bot.handlers.resume import process_resume_content, start_set_resume
 from upwork_bot.db.base import AsyncSessionLocal
-from upwork_bot.db.repo import get_active_resume
+from upwork_bot.db.repo import add_user, delete_user, get_active_resume
 
 
 def _make_state() -> FSMContext:
@@ -28,12 +28,18 @@ def _make_message(text: str) -> Message:
 @pytest.mark.asyncio
 async def test_set_resume_via_text():
     state = _make_state()
-
-    with patch.object(Message, "answer", new_callable=AsyncMock):
-        await start_set_resume(_make_message("✏️ Set resume"), state)
-        await process_resume_content(_make_message("Menu-test resume content"), state)
-        assert await state.get_state() is None
-
     async with AsyncSessionLocal() as session:
-        content = await get_active_resume(session)
-        assert content == "Menu-test resume content"
+        user = await add_user(session, telegram_id=42, display_name="owner")
+
+    try:
+        with patch.object(Message, "answer", new_callable=AsyncMock):
+            await start_set_resume(_make_message("✏️ Set resume"), state)
+            await process_resume_content(_make_message("Menu-test resume content"), state, user)
+            assert await state.get_state() is None
+
+        async with AsyncSessionLocal() as session:
+            content = await get_active_resume(session, user.id)
+            assert content == "Menu-test resume content"
+    finally:
+        async with AsyncSessionLocal() as session:
+            await delete_user(session, telegram_id=42)

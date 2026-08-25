@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import upwork_bot.gmail.client as gmail_client
@@ -77,16 +76,16 @@ def test_fetch_skips_emails_older_than_since(monkeypatch):
             return False
 
     monkeypatch.setattr(gmail_client.imaplib, "IMAP4_SSL", lambda host: _Ctx())
-    settings = SimpleNamespace(
-        gmail_imap_host="h",
-        gmail_address="a",
-        gmail_app_password="p",
-        gmail_mailbox="INBOX",
-        vollna_sender="info@vollna.com",
-    )
 
     since = datetime(2026, 7, 6, 16, 0, tzinfo=UTC)
-    jobs = fetch_new_job_emails(settings, since)
+    jobs = fetch_new_job_emails(
+        address="a",
+        app_password="p",
+        vollna_sender="info@vollna.com",
+        mailbox="INBOX",
+        imap_host="h",
+        since=since,
+    )
 
     assert [j.external_pid for j in jobs] == ["222"]  # old one skipped
     assert "SINCE" in imap.search.call_args.args

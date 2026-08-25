@@ -22,3 +22,27 @@ async def test_generate_proposal_calls_llm_with_context():
 
     assert result == "Dear client, I can help..."
     mock_llm.ainvoke.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_generate_proposal_uses_passed_rate_and_signature():
+    with patch("upwork_bot.llm.proposal_chain._get_llm") as mock_get_llm:
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value.content = "draft"
+        mock_llm.ainvoke.return_value.tool_calls = []
+        mock_get_llm.return_value = mock_llm
+
+        await generate_proposal(
+            resume_text="r",
+            job_title="t",
+            job_description="d",
+            portfolio_snippets=[],
+            example_snippets=[],
+            hourly_rate=77.0,
+            signature_name="Ada",
+        )
+
+    # Per-user rate + signature reach the human message, not the global Settings.
+    human = mock_llm.ainvoke.call_args.args[0][1].content
+    assert "77" in human
+    assert "Ada" in human

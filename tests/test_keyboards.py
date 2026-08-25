@@ -7,6 +7,7 @@ from upwork_bot.bot.keyboards import (
     BTN_PORTFOLIO,
     BTN_RESUME,
     BTN_SETTINGS,
+    BTN_SETUP,
     BTN_SKIP_LINK,
     BTN_WRITE_PROPOSAL,
     cancel_kb,
@@ -29,6 +30,7 @@ def test_main_menu_has_all_sections():
         BTN_EXAMPLES,
         BTN_WRITE_PROPOSAL,
         BTN_SETTINGS,
+        BTN_SETUP,
     }
 
 

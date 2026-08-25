@@ -14,6 +14,7 @@ from upwork_bot.bot.handlers.portfolio import (
 )
 from upwork_bot.db.base import AsyncSessionLocal
 from upwork_bot.db.models import PortfolioProject
+from upwork_bot.db.repo import add_user, delete_user
 
 
 def _make_state() -> FSMContext:
@@ -33,31 +34,35 @@ def _make_message(text: str) -> Message:
 @pytest.mark.asyncio
 async def test_add_project_with_link():
     state = _make_state()
-
     fake_embedding = [0.0] * 1536
-    with (
-        patch.object(Message, "answer", new_callable=AsyncMock),
-        patch(
-            "upwork_bot.bot.handlers.portfolio.embed_text",
-            new=AsyncMock(return_value=fake_embedding),
-        ),
-    ):
-        await start_add_project(_make_message("➕ Add project"), state)
-        await process_project_description(_make_message("menu-test-description"), state)
-        # process_project_description expects title already stored; set it directly since
-        # this test only exercises the description->link->save leg of the sequence.
-        await state.update_data(title="menu-test-title")
-        await process_project_description(_make_message("menu-test-description"), state)
-        await process_project_link(_make_message("https://example.com/menu-test"), state)
-        assert await state.get_state() is None
-
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PortfolioProject).where(PortfolioProject.title == "menu-test-title")
-        )
-        project = result.scalar_one()
-        assert project.description == "menu-test-description"
-        assert project.link == "https://example.com/menu-test"
+        user = await add_user(session, telegram_id=42, display_name="owner")
 
-        await session.delete(project)
-        await session.commit()
+    try:
+        with (
+            patch.object(Message, "answer", new_callable=AsyncMock),
+            patch(
+                "upwork_bot.bot.handlers.portfolio.embed_text",
+                new=AsyncMock(return_value=fake_embedding),
+            ),
+        ):
+            await start_add_project(_make_message("➕ Add project"), state)
+            await process_project_description(_make_message("menu-test-description"), state)
+            # process_project_description expects title already stored; set it directly since
+            # this test only exercises the description->link->save leg of the sequence.
+            await state.update_data(title="menu-test-title")
+            await process_project_description(_make_message("menu-test-description"), state)
+            await process_project_link(_make_message("https://example.com/menu-test"), state, user)
+            assert await state.get_state() is None
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(PortfolioProject).where(PortfolioProject.title == "menu-test-title")
+            )
+            project = result.scalar_one()
+            assert project.description == "menu-test-description"
+            assert project.link == "https://example.com/menu-test"
+            assert project.user_id == user.id
+    finally:
+        async with AsyncSessionLocal() as session:
+            await delete_user(session, telegram_id=42)

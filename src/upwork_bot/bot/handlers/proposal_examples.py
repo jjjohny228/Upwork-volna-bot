@@ -13,6 +13,7 @@ from upwork_bot.bot.keyboards import (
 )
 from upwork_bot.bot.states import ExampleStates
 from upwork_bot.db.base import AsyncSessionLocal
+from upwork_bot.db.models import User
 from upwork_bot.db.repo import (
     add_proposal_example,
     list_proposal_examples,
@@ -24,9 +25,9 @@ router = Router(name="proposal_examples")
 
 
 @router.message(lambda m: m.text == BTN_LIST_EXAMPLES)
-async def cmd_list_examples(message: Message) -> None:
+async def cmd_list_examples(message: Message, user: User) -> None:
     async with AsyncSessionLocal() as session:
-        examples = await list_proposal_examples(session)
+        examples = await list_proposal_examples(session, user.id)
 
     if not examples:
         await message.answer("No proposal examples yet.")
@@ -47,7 +48,7 @@ async def start_add_example(message: Message, state: FSMContext) -> None:
 
 
 @router.message(ExampleStates.waiting_for_text)
-async def process_example_text(message: Message, state: FSMContext) -> None:
+async def process_example_text(message: Message, state: FSMContext, user: User) -> None:
     if message.text in (BTN_BACK, BTN_CANCEL):
         await state.clear()
         await message.answer("Cancelled.", reply_markup=examples_menu_kb())
@@ -55,16 +56,16 @@ async def process_example_text(message: Message, state: FSMContext) -> None:
 
     embedding = await embed_text(message.text)
     async with AsyncSessionLocal() as session:
-        example = await add_proposal_example(session, message.text, embedding)
+        example = await add_proposal_example(session, user.id, message.text, embedding)
     await state.clear()
     await message.answer(f"Added proposal example #{example.id}", reply_markup=examples_menu_kb())
 
 
 @router.callback_query(lambda c: c.data.startswith("delexample:"))
-async def delete_example_callback(callback: CallbackQuery) -> None:
+async def delete_example_callback(callback: CallbackQuery, user: User) -> None:
     example_id = int(callback.data.split(":", 1)[1])
     async with AsyncSessionLocal() as session:
-        removed = await remove_proposal_example(session, example_id)
+        removed = await remove_proposal_example(session, example_id, user.id)
     await callback.answer("Deleted." if removed else "Not found.")
     if removed:
         await callback.message.edit_text(callback.message.text + "\n\n(deleted)")

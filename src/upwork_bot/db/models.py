@@ -5,6 +5,7 @@ from sqlalchemy import (
     ARRAY,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     LargeBinary,
     Text,
@@ -22,16 +23,33 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(unique=True, index=True)
     display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    gmail_address: Mapped[str | None] = mapped_column(Text, nullable=True)
-    gmail_app_password: Mapped[str | None] = mapped_column(Text, nullable=True)
     analysis_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
-    gmail_cursor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hourly_rate: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    signature_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # Job delivery mode: when true, only qualified jobs are pushed to the user;
     # when false (default), every job is pushed (disqualified ones arrive silently).
     notify_qualified_only: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class Mailbox(Base):
+    __tablename__ = "mailboxes"
+    __table_args__ = (UniqueConstraint("user_id", "address", name="uq_mailboxes_user_address"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    address: Mapped[str] = mapped_column(Text)
+    app_password: Mapped[str] = mapped_column(Text)
+    mailbox: Mapped[str] = mapped_column(Text, default="INBOX", server_default="INBOX")
+    imap_host: Mapped[str] = mapped_column(
+        Text, default="imap.gmail.com", server_default="imap.gmail.com"
+    )
+    # Per-mailbox watermark (ISO datetime): only emails at/after this are processed.
+    cursor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
