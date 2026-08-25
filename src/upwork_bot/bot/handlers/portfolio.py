@@ -14,6 +14,7 @@ from upwork_bot.bot.keyboards import (
 )
 from upwork_bot.bot.states import PortfolioStates
 from upwork_bot.db.base import AsyncSessionLocal
+from upwork_bot.db.models import User
 from upwork_bot.db.repo import (
     add_portfolio_project,
     list_portfolio_projects,
@@ -25,9 +26,9 @@ router = Router(name="portfolio")
 
 
 @router.message(lambda m: m.text == BTN_LIST_PROJECTS)
-async def cmd_list_projects(message: Message) -> None:
+async def cmd_list_projects(message: Message, user: User) -> None:
     async with AsyncSessionLocal() as session:
-        projects = await list_portfolio_projects(session)
+        projects = await list_portfolio_projects(session, user.id)
 
     if not projects:
         await message.answer("No portfolio projects yet.")
@@ -71,12 +72,14 @@ async def process_project_description(message: Message, state: FSMContext) -> No
     await message.answer("Send a link, or tap Skip.", reply_markup=skip_link_kb())
 
 
-async def _save_project(message: Message, state: FSMContext, link: str | None) -> None:
+async def _save_project(
+    message: Message, state: FSMContext, user_id: int, link: str | None
+) -> None:
     data = await state.get_data()
     embedding = await embed_text(f"{data['title']}\n{data['description']}")
     async with AsyncSessionLocal() as session:
         project = await add_portfolio_project(
-            session, data["title"], data["description"], link, embedding
+            session, user_id, data["title"], data["description"], link, embedding
         )
     await state.clear()
     await message.answer(
@@ -85,26 +88,26 @@ async def _save_project(message: Message, state: FSMContext, link: str | None) -
 
 
 @router.message(PortfolioStates.waiting_for_link)
-async def process_project_link(message: Message, state: FSMContext) -> None:
+async def process_project_link(message: Message, state: FSMContext, user: User) -> None:
     if message.text in (BTN_BACK, BTN_CANCEL):
         await state.clear()
         await message.answer("Cancelled.", reply_markup=portfolio_menu_kb())
         return
 
-    await _save_project(message, state, link=message.text)
+    await _save_project(message, state, user.id, link=message.text)
 
 
 @router.callback_query(lambda c: c.data == "skip_link", PortfolioStates.waiting_for_link)
-async def skip_project_link(callback: CallbackQuery, state: FSMContext) -> None:
+async def skip_project_link(callback: CallbackQuery, state: FSMContext, user: User) -> None:
     await callback.answer()
-    await _save_project(callback.message, state, link=None)
+    await _save_project(callback.message, state, user.id, link=None)
 
 
 @router.callback_query(lambda c: c.data.startswith("delproject:"))
-async def delete_project_callback(callback: CallbackQuery) -> None:
+async def delete_project_callback(callback: CallbackQuery, user: User) -> None:
     project_id = int(callback.data.split(":", 1)[1])
     async with AsyncSessionLocal() as session:
-        removed = await remove_portfolio_project(session, project_id)
+        removed = await remove_portfolio_project(session, project_id, user.id)
     await callback.answer("Deleted." if removed else "Not found.")
     if removed:
         await callback.message.edit_text(callback.message.text + "\n\n(deleted)")

@@ -17,6 +17,7 @@ from upwork_bot.bot.keyboards import (
 )
 from upwork_bot.bot.states import CustomProposalStates
 from upwork_bot.db.base import AsyncSessionLocal
+from upwork_bot.db.models import User
 from upwork_bot.db.repo import (
     get_active_resume,
     get_job,
@@ -62,6 +63,7 @@ def _custom_regenerate_keyboard() -> InlineKeyboardMarkup:
 
 
 async def _proposal_from_description(
+    user: User,
     description: str,
     previous_version: str | None = None,
     feedback: str | None = None,
@@ -69,10 +71,10 @@ async def _proposal_from_description(
     """Run the RAG pipeline + LLM for an ad-hoc project description (no stored Job)."""
     title = description.splitlines()[0][:120] if description.strip() else "Custom project"
     async with AsyncSessionLocal() as session:
-        resume_text = await get_active_resume(session) or ""
+        resume_text = await get_active_resume(session, user.id) or ""
         embedding = await embed_text(description)
-        portfolio = await search_similar_portfolio(session, embedding)
-        examples = await search_similar_examples(session, embedding)
+        portfolio = await search_similar_portfolio(session, user.id, embedding)
+        examples = await search_similar_examples(session, user.id, embedding)
         portfolio_snippets = [portfolio_snippet(p) for p in portfolio]
         example_snippets = [e.source_text for e in examples]
 
@@ -84,6 +86,8 @@ async def _proposal_from_description(
         example_snippets=example_snippets,
         previous_version=previous_version,
         feedback=feedback,
+        hourly_rate=user.hourly_rate,
+        signature_name=user.signature_name or "",
     )
 
 
@@ -99,18 +103,22 @@ async def handle_regen_request(callback: CallbackQuery, state: FSMContext) -> No
 
 
 @router.message(ProposalFeedbackStates.waiting_for_feedback)
-async def handle_feedback_message(message: Message, state: FSMContext) -> None:
+async def handle_feedback_message(message: Message, state: FSMContext, user: User) -> None:
     data = await state.get_data()
     job_id = data["job_id"]
     feedback = message.text or ""
 
     async with AsyncSessionLocal() as session:
         job = await get_job(session, job_id)
+        if job is None or job.user_id != user.id:
+            await state.clear()
+            await message.answer("Job not found.", reply_markup=main_menu_kb())
+            return
         latest = await get_latest_proposal(session, job_id)
-        resume_text = await get_active_resume(session) or ""
+        resume_text = await get_active_resume(session, user.id) or ""
         embedding = await embed_text(job.description)
-        portfolio = await search_similar_portfolio(session, embedding)
-        examples = await search_similar_examples(session, embedding)
+        portfolio = await search_similar_portfolio(session, user.id, embedding)
+        examples = await search_similar_examples(session, user.id, embedding)
 
         content = await generate_proposal(
             resume_text=resume_text,
@@ -120,6 +128,8 @@ async def handle_feedback_message(message: Message, state: FSMContext) -> None:
             example_snippets=[e.source_text for e in examples],
             previous_version=latest.content if latest else None,
             feedback=feedback,
+            hourly_rate=user.hourly_rate,
+            signature_name=user.signature_name or "",
         )
 
         next_version = (latest.version + 1) if latest else 1
@@ -145,7 +155,7 @@ async def start_custom_proposal(message: Message, state: FSMContext) -> None:
 
 
 @router.message(CustomProposalStates.waiting_for_description)
-async def write_custom_proposal(message: Message, state: FSMContext) -> None:
+async def write_custom_proposal(message: Message, state: FSMContext, user: User) -> None:
     if message.text in (BTN_BACK, BTN_CANCEL):
         await state.clear()
         await message.answer("Cancelled.", reply_markup=main_menu_kb())
@@ -158,7 +168,7 @@ async def write_custom_proposal(message: Message, state: FSMContext) -> None:
 
     # Restore the main menu now so no stray Cancel button lingers after generation.
     await message.answer("Writing proposal...", reply_markup=main_menu_kb())
-    content = await _proposal_from_description(description)
+    content = await _proposal_from_description(user, description)
 
     # Keep the description + draft in FSM so the inline "regenerate" can reuse them.
     await state.set_state(None)
@@ -183,7 +193,7 @@ async def handle_custom_regen_request(callback: CallbackQuery, state: FSMContext
 
 
 @router.message(CustomProposalStates.waiting_for_feedback)
-async def handle_custom_feedback(message: Message, state: FSMContext) -> None:
+async def handle_custom_feedback(message: Message, state: FSMContext, user: User) -> None:
     if message.text in (BTN_BACK, BTN_CANCEL):
         await state.set_state(None)
         await message.answer("Kept the current draft.", reply_markup=main_menu_kb())
@@ -202,7 +212,7 @@ async def handle_custom_feedback(message: Message, state: FSMContext) -> None:
     feedback = message.text or ""
     await message.answer("Regenerating...")
     content = await _proposal_from_description(
-        description, previous_version=data.get("custom_draft"), feedback=feedback
+        user, description, previous_version=data.get("custom_draft"), feedback=feedback
     )
 
     await state.set_state(None)

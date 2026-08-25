@@ -130,47 +130,49 @@ pg_restore --clean --if-exists -d upwork path/to/backup.dump
 
 ## Per-user setup
 
-Once the admin has added your Telegram ID, send `/start` and work through these sections.
+Once the admin has added your Telegram ID, send `/start`. Tap **ℹ️ Setup guide** for a live
+checklist (✅/❌) of what's still missing, then work through the sections below. Everything —
+mailboxes, resume, portfolio, proposal examples, qualify prompt, rate, signature — is scoped
+to you.
 
-### 1. Connect your Gmail
+### 1. Connect your Gmail mailbox(es)
 
-Vollna emails you one message per matching job. Point the bot at that inbox:
+Vollna emails you one message per matching job. You can point the bot at **several** inboxes;
+jobs are polled from every one you add.
 
-1. In Gmail, enable 2FA and create an **App Password** (Google Account → Security → App
-   passwords). IMAP must be enabled.
-2. In the bot: **Email source → set address**, then **set app password**. Use **Test
-   connection** to confirm.
+1. In Gmail, enable 2-Step Verification and create an **App Password** (Google Account →
+   Security → App passwords). IMAP must be enabled.
+2. In the bot: **⚙️ Settings → 📮 Mailboxes → ➕ Add mailbox**, then send the address, the App
+   Password, and (optionally) an IMAP folder — tap **Use INBOX** to accept the default.
+   **📃 List mailboxes** shows them with a delete button.
 
-<!-- SCREENSHOT: the "Email source" menu with address/app-password/test-connection buttons.
-     Save as docs/images/email-source.png -->
-![Email source](docs/images/email-source.png)
+### 2. Add your resume, portfolio, and proposal examples
 
-### 2. Set your analysis prompt
+These feed both the qualifier and the proposal generator (RAG).
 
-This is what decides whether a job is a fit for *you*.
+- **📄 Resume** — paste text or upload a `.pdf` / `.docx` (one resume per user).
+- **💼 Portfolio** — add projects (title → description → optional link).
+- **✍️ Proposal examples** — paste past proposals that worked; the bot learns your voice.
 
-- **Paste my own** — supply your own system prompt.
-- **Generate from my experience** — paste a description of your stack and experience, or
-  upload a PDF (résumé / capabilities doc), and the bot writes a tailored prompt for you.
-- **View current** — see what's active.
+### 3. Set your qualify prompt
 
-<!-- SCREENSHOT: the "Analysis prompt" menu, and/or an example generated prompt.
-     Save as docs/images/analysis-prompt.png -->
-![Analysis prompt](docs/images/analysis-prompt.png)
+**⚙️ Settings → 🎯 Qualify prompt** decides whether a job is a fit for *you*.
 
-### 3. Add your resume, portfolio, and proposal examples
+- **✨ Generate prompt** — writes a tailored prompt from your resume + portfolio and saves it.
+  Requires a resume **and** at least one portfolio project first, otherwise it refuses and
+  tells you what to add. Use **🔄 Regenerate** to try again.
+- **✏️ Set prompt** — paste your own.
+- **👁 View prompt** — see what's active (or that the built-in default is in use).
 
-These feed the proposal generator (RAG). All are scoped to you.
+### 4. Set your rate, signature, and delivery mode
 
-- **Resume** — paste text or upload a `.pdf` / `.docx`.
-- **Portfolio** — add projects (title → description → optional link).
-- **Proposal examples** — paste past proposals that worked; the bot learns your voice.
+Under **⚙️ Settings**:
 
-<!-- SCREENSHOT: the main menu showing Resume / Portfolio / Proposal examples sections.
-     Save as docs/images/main-menu.png -->
-![Main menu](docs/images/main-menu.png)
+- **💲 Hourly rate** and **✒️ Signature** — used when drafting proposals.
+- Delivery: **📬 Send all jobs** (disqualified ones arrive silently) or **✅ Send only
+  qualified**.
 
-### 4. Receive jobs and draft proposals
+### 5. Receive jobs and draft proposals
 
 New matching jobs arrive as cards. Tap **📝 Generate proposal** for a draft, then
 **🔄 Regenerate with edits** and send a correction to refine it. Tap **🔗 Open job** to go

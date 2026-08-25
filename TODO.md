@@ -105,6 +105,10 @@ pays for everything.
 - [ ] Scope resume, portfolio, and proposal-example handlers + RAG retrieval to the
       calling user's `user_id` (pgvector similarity filtered by user).
 - [ ] Proposal generation pulls only that user's resume/portfolio/examples.
+- [ ] Improve the proposal prompt (`proposal_chain.py`) to detect and directly answer
+      questions the client asked in the job description (e.g. "how would you approach X?",
+      "what's your experience with Y?") — when the description poses direct questions, the
+      generated proposal must address them explicitly.
 - [ ] Tests: two users' examples don't cross-contaminate retrieval.
 
 ## Phase 7 — OpenAI quota / token error handling

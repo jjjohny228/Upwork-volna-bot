@@ -8,7 +8,7 @@ from upwork_bot.bot.main import create_bot, create_dispatcher
 from upwork_bot.config import get_settings
 from upwork_bot.db.base import AsyncSessionLocal
 from upwork_bot.db.models import Job
-from upwork_bot.db.repo import save_job_analysis
+from upwork_bot.db.repo import get_user, save_job_analysis
 from upwork_bot.gmail.poller import run_forever
 from upwork_bot.llm.analysis_chain import qualify_job
 
@@ -16,8 +16,20 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def _on_new_job(bot, job: Job) -> None:
+    # Qualify against the job owner's personalized prompt (falls back to default).
+    analysis_prompt = None
+    if job.user_id is not None:
+        async with AsyncSessionLocal() as session:
+            owner = await get_user(session, job.user_id)
+        if owner is not None:
+            analysis_prompt = owner.analysis_prompt
+
     # Local qualifier is the sole source of truth; drives the loud/silent notify.
-    qualification = await qualify_job(job_title=job.title, job_description=job.description)
+    qualification = await qualify_job(
+        job_title=job.title,
+        job_description=job.description,
+        analysis_prompt=analysis_prompt,
+    )
 
     async with AsyncSessionLocal() as session:
         await save_job_analysis(session, job.id, qualification)

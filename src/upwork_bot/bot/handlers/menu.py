@@ -8,9 +8,11 @@ from upwork_bot.bot.keyboards import (
     BTN_DELIVERY_ALL,
     BTN_DELIVERY_QUALIFIED,
     BTN_EXAMPLES,
+    BTN_PAUSE_PARSING,
     BTN_PORTFOLIO,
     BTN_RESUME,
     BTN_SETTINGS,
+    BTN_START_PARSING,
     examples_menu_kb,
     main_menu_kb,
     portfolio_menu_kb,
@@ -19,7 +21,7 @@ from upwork_bot.bot.keyboards import (
 )
 from upwork_bot.db.base import AsyncSessionLocal
 from upwork_bot.db.models import User
-from upwork_bot.db.repo import set_notify_qualified_only
+from upwork_bot.db.repo import set_notify_qualified_only, set_parsing_active
 
 router = Router(name="menu")
 
@@ -30,11 +32,11 @@ def _delivery_status_line(notify_qualified_only: bool) -> str:
 
 
 @router.message(Command("start"))
-async def cmd_start(message: Message, state: FSMContext) -> None:
+async def cmd_start(message: Message, state: FSMContext, user: User) -> None:
     await state.clear()
     await message.answer(
         "Welcome to the Upwork Job-Hunter admin menu. Choose a section:",
-        reply_markup=main_menu_kb(),
+        reply_markup=main_menu_kb(user.parsing_active),
     )
 
 
@@ -90,6 +92,30 @@ async def set_delivery_qualified(message: Message, state: FSMContext, user: User
 
 
 @router.message(lambda m: m.text == BTN_BACK)
-async def go_back_to_main_menu(message: Message, state: FSMContext) -> None:
+async def go_back_to_main_menu(message: Message, state: FSMContext, user: User) -> None:
     await state.clear()
-    await message.answer("Main menu:", reply_markup=main_menu_kb())
+    await message.answer("Main menu:", reply_markup=main_menu_kb(user.parsing_active))
+
+
+@router.message(lambda m: m.text == BTN_PAUSE_PARSING)
+async def pause_parsing(message: Message, state: FSMContext, user: User) -> None:
+    await state.clear()
+    async with AsyncSessionLocal() as session:
+        await set_parsing_active(session, user.telegram_id, False)
+    user.parsing_active = False
+    await message.answer(
+        "⏸ Parsing <b>paused</b>. Jobs that arrive while paused are skipped.",
+        reply_markup=main_menu_kb(user.parsing_active),
+    )
+
+
+@router.message(lambda m: m.text == BTN_START_PARSING)
+async def start_parsing(message: Message, state: FSMContext, user: User) -> None:
+    await state.clear()
+    async with AsyncSessionLocal() as session:
+        await set_parsing_active(session, user.telegram_id, True)
+    user.parsing_active = True
+    await message.answer(
+        "▶️ Parsing <b>started</b>.",
+        reply_markup=main_menu_kb(user.parsing_active),
+    )

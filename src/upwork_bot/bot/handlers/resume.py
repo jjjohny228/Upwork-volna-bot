@@ -16,6 +16,7 @@ from upwork_bot.bot.keyboards import (
 )
 from upwork_bot.bot.states import ResumeStates
 from upwork_bot.db.base import AsyncSessionLocal
+from upwork_bot.db.models import User
 from upwork_bot.db.repo import get_active_resume, get_active_resume_pdf, upsert_resume
 from upwork_bot.pdf_utils import text_to_pdf
 
@@ -32,10 +33,10 @@ def _extract_text(filename: str, data: bytes) -> str:
 
 
 @router.message(lambda m: m.text == BTN_VIEW_RESUME)
-async def view_resume(message: Message) -> None:
+async def view_resume(message: Message, user: User) -> None:
     async with AsyncSessionLocal() as session:
-        content = await get_active_resume(session)
-        pdf_bytes = await get_active_resume_pdf(session)
+        content = await get_active_resume(session, user.id)
+        pdf_bytes = await get_active_resume_pdf(session, user.id)
 
     if not content and not pdf_bytes:
         await message.answer("No resume set yet.")
@@ -60,7 +61,7 @@ async def start_set_resume(message: Message, state: FSMContext) -> None:
 
 
 @router.message(ResumeStates.waiting_for_content)
-async def process_resume_content(message: Message, state: FSMContext) -> None:
+async def process_resume_content(message: Message, state: FSMContext, user: User) -> None:
     if message.text in (BTN_BACK, BTN_CANCEL):
         await state.clear()
         await message.answer("Cancelled.", reply_markup=resume_menu_kb())
@@ -86,6 +87,6 @@ async def process_resume_content(message: Message, state: FSMContext) -> None:
         return
 
     async with AsyncSessionLocal() as session:
-        await upsert_resume(session, content=content, pdf_bytes=pdf_bytes)
+        await upsert_resume(session, user.id, content=content, pdf_bytes=pdf_bytes)
     await state.clear()
     await message.answer("Resume updated.", reply_markup=resume_menu_kb())

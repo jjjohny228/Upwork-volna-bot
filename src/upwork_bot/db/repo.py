@@ -1,3 +1,4 @@
+from datetime import time
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
@@ -6,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from upwork_bot.db.models import (
     Job,
+    Mailbox,
     PortfolioProject,
     Proposal,
     ProposalExample,
@@ -93,6 +95,127 @@ async def set_notify_qualified_only(
     return True
 
 
+async def set_hourly_rate(session: AsyncSession, telegram_id: int, rate: float) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.hourly_rate = rate
+    await session.commit()
+    return True
+
+
+async def set_signature_name(session: AsyncSession, telegram_id: int, name: str) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.signature_name = name
+    await session.commit()
+    return True
+
+
+async def set_analysis_prompt(session: AsyncSession, telegram_id: int, prompt: str) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.analysis_prompt = prompt
+    await session.commit()
+    return True
+
+
+async def set_timezone(session: AsyncSession, telegram_id: int, tz: str) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.timezone = tz
+    await session.commit()
+    return True
+
+
+async def set_parsing_active(session: AsyncSession, telegram_id: int, active: bool) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.parsing_active = active
+    await session.commit()
+    return True
+
+
+async def set_quiet_hours_enabled(session: AsyncSession, telegram_id: int, enabled: bool) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.quiet_hours_enabled = enabled
+    await session.commit()
+    return True
+
+
+async def set_quiet_window(session: AsyncSession, telegram_id: int, start: time, end: time) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.quiet_start = start
+    user.quiet_end = end
+    await session.commit()
+    return True
+
+
+# --- Mailboxes -------------------------------------------------------------
+
+
+async def list_active_mailboxes(session: AsyncSession) -> list[Mailbox]:
+    result = await session.execute(
+        select(Mailbox).where(Mailbox.is_active.is_(True)).order_by(Mailbox.id)
+    )
+    return list(result.scalars())
+
+
+async def list_user_mailboxes(session: AsyncSession, user_id: int) -> list[Mailbox]:
+    result = await session.execute(
+        select(Mailbox).where(Mailbox.user_id == user_id).order_by(Mailbox.id)
+    )
+    return list(result.scalars())
+
+
+async def add_mailbox(
+    session: AsyncSession,
+    user_id: int,
+    address: str,
+    app_password: str,
+    mailbox: str = "INBOX",
+    imap_host: str = "imap.gmail.com",
+) -> Mailbox:
+    row = Mailbox(
+        user_id=user_id,
+        address=address,
+        app_password=app_password,
+        mailbox=mailbox,
+        imap_host=imap_host,
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+async def remove_mailbox(session: AsyncSession, mailbox_id: int, user_id: int) -> bool:
+    result = await session.execute(
+        select(Mailbox).where(Mailbox.id == mailbox_id, Mailbox.user_id == user_id)
+    )
+    row = result.scalars().first()
+    if row is None:
+        return False
+    await session.delete(row)
+    await session.commit()
+    return True
+
+
+async def set_mailbox_cursor(session: AsyncSession, mailbox_id: int, cursor: str) -> None:
+    row = await session.get(Mailbox, mailbox_id)
+    if row is not None:
+        row.cursor = cursor
+        await session.commit()
+
+
 # --- Jobs ------------------------------------------------------------------
 
 
@@ -118,14 +241,18 @@ async def insert_job_if_new(session: AsyncSession, job_email: JobEmail, user_id:
     return result.scalar_one_or_none()
 
 
-async def get_active_resume(session: AsyncSession) -> str | None:
-    result = await session.execute(select(Resume).order_by(Resume.updated_at.desc()).limit(1))
+async def get_active_resume(session: AsyncSession, user_id: int) -> str | None:
+    result = await session.execute(
+        select(Resume).where(Resume.user_id == user_id).order_by(Resume.updated_at.desc()).limit(1)
+    )
     resume = result.scalars().first()
     return resume.content if resume else None
 
 
-async def get_active_resume_pdf(session: AsyncSession) -> bytes | None:
-    result = await session.execute(select(Resume).order_by(Resume.updated_at.desc()).limit(1))
+async def get_active_resume_pdf(session: AsyncSession, user_id: int) -> bytes | None:
+    result = await session.execute(
+        select(Resume).where(Resume.user_id == user_id).order_by(Resume.updated_at.desc()).limit(1)
+    )
     resume = result.scalars().first()
     return resume.pdf_bytes if resume else None
 
@@ -142,21 +269,27 @@ async def save_job_analysis(
 
 
 async def upsert_resume(
-    session: AsyncSession, content: str, pdf_bytes: bytes | None = None
+    session: AsyncSession, user_id: int, content: str, pdf_bytes: bytes | None = None
 ) -> None:
-    resume = Resume(content=content, pdf_bytes=pdf_bytes)
-    session.add(resume)
+    # One resume per user: replace any existing row(s) for this user.
+    existing = await session.execute(select(Resume).where(Resume.user_id == user_id))
+    for row in existing.scalars():
+        await session.delete(row)
+    session.add(Resume(user_id=user_id, content=content, pdf_bytes=pdf_bytes))
     await session.commit()
 
 
 async def add_portfolio_project(
     session: AsyncSession,
+    user_id: int,
     title: str,
     description: str,
     link: str | None,
     embedding: list[float],
 ) -> PortfolioProject:
-    project = PortfolioProject(title=title, description=description, link=link, embedding=embedding)
+    project = PortfolioProject(
+        user_id=user_id, title=title, description=description, link=link, embedding=embedding
+    )
     session.add(project)
     await session.commit()
     await session.refresh(project)
@@ -164,22 +297,29 @@ async def add_portfolio_project(
 
 
 async def add_proposal_example(
-    session: AsyncSession, source_text: str, embedding: list[float]
+    session: AsyncSession, user_id: int, source_text: str, embedding: list[float]
 ) -> ProposalExample:
-    example = ProposalExample(source_text=source_text, embedding=embedding)
+    example = ProposalExample(user_id=user_id, source_text=source_text, embedding=embedding)
     session.add(example)
     await session.commit()
     await session.refresh(example)
     return example
 
 
-async def list_portfolio_projects(session: AsyncSession) -> list[PortfolioProject]:
-    result = await session.execute(select(PortfolioProject))
+async def list_portfolio_projects(session: AsyncSession, user_id: int) -> list[PortfolioProject]:
+    result = await session.execute(
+        select(PortfolioProject).where(PortfolioProject.user_id == user_id)
+    )
     return list(result.scalars())
 
 
-async def remove_portfolio_project(session: AsyncSession, project_id: int) -> bool:
-    project = await session.get(PortfolioProject, project_id)
+async def remove_portfolio_project(session: AsyncSession, project_id: int, user_id: int) -> bool:
+    result = await session.execute(
+        select(PortfolioProject).where(
+            PortfolioProject.id == project_id, PortfolioProject.user_id == user_id
+        )
+    )
+    project = result.scalars().first()
     if project is None:
         return False
     await session.delete(project)
@@ -187,13 +327,20 @@ async def remove_portfolio_project(session: AsyncSession, project_id: int) -> bo
     return True
 
 
-async def list_proposal_examples(session: AsyncSession) -> list[ProposalExample]:
-    result = await session.execute(select(ProposalExample))
+async def list_proposal_examples(session: AsyncSession, user_id: int) -> list[ProposalExample]:
+    result = await session.execute(
+        select(ProposalExample).where(ProposalExample.user_id == user_id)
+    )
     return list(result.scalars())
 
 
-async def remove_proposal_example(session: AsyncSession, example_id: int) -> bool:
-    example = await session.get(ProposalExample, example_id)
+async def remove_proposal_example(session: AsyncSession, example_id: int, user_id: int) -> bool:
+    result = await session.execute(
+        select(ProposalExample).where(
+            ProposalExample.id == example_id, ProposalExample.user_id == user_id
+        )
+    )
+    example = result.scalars().first()
     if example is None:
         return False
     await session.delete(example)
@@ -202,10 +349,11 @@ async def remove_proposal_example(session: AsyncSession, example_id: int) -> boo
 
 
 async def search_similar_portfolio(
-    session: AsyncSession, embedding: list[float], top_k: int = 3
+    session: AsyncSession, user_id: int, embedding: list[float], top_k: int = 3
 ) -> list[PortfolioProject]:
     stmt = (
         select(PortfolioProject)
+        .where(PortfolioProject.user_id == user_id)
         .order_by(PortfolioProject.embedding.cosine_distance(embedding))
         .limit(top_k)
     )
@@ -214,10 +362,11 @@ async def search_similar_portfolio(
 
 
 async def search_similar_examples(
-    session: AsyncSession, embedding: list[float], top_k: int = 3
+    session: AsyncSession, user_id: int, embedding: list[float], top_k: int = 3
 ) -> list[ProposalExample]:
     stmt = (
         select(ProposalExample)
+        .where(ProposalExample.user_id == user_id)
         .order_by(ProposalExample.embedding.cosine_distance(embedding))
         .limit(top_k)
     )

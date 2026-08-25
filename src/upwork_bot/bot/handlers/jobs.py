@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from upwork_bot.config import get_settings
 from upwork_bot.db.base import AsyncSessionLocal
-from upwork_bot.db.models import Job
+from upwork_bot.db.models import Job, User
 from upwork_bot.db.repo import (
     get_active_resume,
     get_job,
@@ -79,16 +79,19 @@ async def notify_new_job(bot: Bot, job: Job) -> None:
 
 
 @router.callback_query(lambda c: c.data.startswith("gen_proposal:"))
-async def handle_generate_proposal(callback: CallbackQuery) -> None:
+async def handle_generate_proposal(callback: CallbackQuery, user: User) -> None:
     job_id = int(callback.data.split(":", 1)[1])
     await callback.answer("Generating proposal...")
 
     async with AsyncSessionLocal() as session:
         job = await get_job(session, job_id)
-        resume_text = await get_active_resume(session) or ""
+        if job is None or job.user_id != user.id:
+            await callback.message.answer("Job not found.")
+            return
+        resume_text = await get_active_resume(session, user.id) or ""
         embedding = await embed_text(job.description)
-        portfolio = await search_similar_portfolio(session, embedding)
-        examples = await search_similar_examples(session, embedding)
+        portfolio = await search_similar_portfolio(session, user.id, embedding)
+        examples = await search_similar_examples(session, user.id, embedding)
 
         content = await generate_proposal(
             resume_text=resume_text,
@@ -96,6 +99,8 @@ async def handle_generate_proposal(callback: CallbackQuery) -> None:
             job_description=job.description,
             portfolio_snippets=[portfolio_snippet(p) for p in portfolio],
             example_snippets=[e.source_text for e in examples],
+            hourly_rate=user.hourly_rate,
+            signature_name=user.signature_name or "",
         )
 
         await save_proposal(session, job_id=job.id, version=1, content=content)

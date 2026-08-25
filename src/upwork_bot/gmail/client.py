@@ -131,7 +131,14 @@ def _message_date(msg: Message) -> datetime | None:
     return dt
 
 
-def fetch_new_job_emails(settings, since: datetime | None = None) -> list[JobEmail]:
+def fetch_new_job_emails(
+    address: str,
+    app_password: str,
+    vollna_sender: str,
+    mailbox: str = "INBOX",
+    imap_host: str = "imap.gmail.com",
+    since: datetime | None = None,
+) -> list[JobEmail]:
     """Fetch unseen Vollna job emails over IMAP, parse them, mark them seen.
 
     When `since` is given, only emails whose Date is at/after `since` are
@@ -142,14 +149,14 @@ def fetch_new_job_emails(settings, since: datetime | None = None) -> list[JobEma
     Blocking (imaplib); call via asyncio.to_thread from the async poller.
     """
     jobs: list[JobEmail] = []
-    criteria = ["UNSEEN", "FROM", settings.vollna_sender]
+    criteria = ["UNSEEN", "FROM", vollna_sender]
     if since is not None:
         # IMAP SINCE is date-granular; the precise cutoff is applied per message.
         criteria += ["SINCE", since.strftime("%d-%b-%Y")]
 
-    with imaplib.IMAP4_SSL(settings.gmail_imap_host) as imap:
-        imap.login(settings.gmail_address, settings.gmail_app_password)
-        imap.select(settings.gmail_mailbox)
+    with imaplib.IMAP4_SSL(imap_host) as imap:
+        imap.login(address, app_password)
+        imap.select(mailbox)
         typ, data = imap.search(None, *criteria)
         if typ != "OK" or not data or not data[0]:
             return jobs

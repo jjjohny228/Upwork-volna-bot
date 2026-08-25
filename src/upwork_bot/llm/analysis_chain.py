@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 
@@ -51,14 +51,6 @@ DISQUALIFY — context red flags (any one is enough):
 Return: qualified (true = bid-worthy, false = skip), a one-sentence short_summary of what the job is, and reason (1-2 sentences citing the decisive fit or the specific red flag)."""  # noqa: E501
 
 
-ANALYSIS_PROMPT = ChatPromptTemplate.from_messages(
-    [
-        ("system", QUALIFIER_SYSTEM_PROMPT),
-        ("human", "JOB TITLE: {title}\n\nJOB DESCRIPTION:\n{description}"),
-    ]
-)
-
-
 class JobQualification(BaseModel):
     qualified: bool
     short_summary: str
@@ -66,12 +58,20 @@ class JobQualification(BaseModel):
 
 
 @lru_cache
-def _get_structured_llm():
+def _get_analysis_llm():
     settings = get_settings()
     llm = ChatOpenAI(model="gpt-5.4-mini", api_key=settings.openai_api_key, temperature=0)
-    return ANALYSIS_PROMPT | llm.with_structured_output(JobQualification)
+    return llm.with_structured_output(JobQualification)
 
 
-async def qualify_job(job_title: str, job_description: str) -> JobQualification:
-    chain = _get_structured_llm()
-    return await chain.ainvoke({"title": job_title, "description": job_description})
+async def qualify_job(
+    job_title: str, job_description: str, analysis_prompt: str | None = None
+) -> JobQualification:
+    # Build messages directly (not via a prompt template) so a user-authored
+    # analysis_prompt containing literal { } braces is never parsed as template vars.
+    system_prompt = analysis_prompt or QUALIFIER_SYSTEM_PROMPT
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=f"JOB TITLE: {job_title}\n\nJOB DESCRIPTION:\n{job_description}"),
+    ]
+    return await _get_analysis_llm().ainvoke(messages)

@@ -108,8 +108,9 @@ async def generate_proposal(
     example_snippets: list[str],
     previous_version: str | None = None,
     feedback: str | None = None,
+    hourly_rate: float = 0.0,
+    signature_name: str = "",
 ) -> str:
-    settings = get_settings()
     llm = _get_llm()
     messages = PROPOSAL_PROMPT.format_messages(
         resume=resume_text,
@@ -117,8 +118,8 @@ async def generate_proposal(
         description=job_description,
         portfolio="\n---\n".join(portfolio_snippets) or "(none)",
         examples="\n---\n".join(example_snippets) or "(none)",
-        rate_context=_build_rate_context(settings.hourly_rate),
-        signature_context=_build_signature_context(settings.proposal_signature_name),
+        rate_context=_build_rate_context(hourly_rate),
+        signature_context=_build_signature_context(signature_name),
         revision_context=_build_revision_context(previous_version, feedback),
     )
     response = await llm.ainvoke(messages)

@@ -1,3 +1,5 @@
+import datetime as _dt
+
 import pytest
 from sqlalchemy import select
 
@@ -108,7 +110,9 @@ async def test_user_crud_and_toggle():
 @pytest.mark.asyncio
 async def test_list_and_remove_portfolio_project():
     async with AsyncSessionLocal() as session:
+        user = await add_user(session, telegram_id=555001, display_name="repo-portfolio")
         project = PortfolioProject(
+            user_id=user.id,
             title="repo-test-project",
             description="d",
             link=None,
@@ -118,35 +122,79 @@ async def test_list_and_remove_portfolio_project():
         await session.commit()
         await session.refresh(project)
 
-        projects = await list_portfolio_projects(session)
+        projects = await list_portfolio_projects(session, user.id)
         assert any(p.id == project.id for p in projects)
 
-        removed = await remove_portfolio_project(session, project.id)
+        # Ownership is enforced: another user cannot delete it.
+        assert await remove_portfolio_project(session, project.id, user.id + 999999) is False
+
+        removed = await remove_portfolio_project(session, project.id, user.id)
         assert removed is True
 
-        removed_again = await remove_portfolio_project(session, project.id)
+        removed_again = await remove_portfolio_project(session, project.id, user.id)
         assert removed_again is False
 
-        projects_after = await list_portfolio_projects(session)
+        projects_after = await list_portfolio_projects(session, user.id)
         assert all(p.id != project.id for p in projects_after)
+
+        await delete_user(session, telegram_id=555001)
 
 
 @pytest.mark.asyncio
 async def test_list_and_remove_proposal_example():
     async with AsyncSessionLocal() as session:
-        example = ProposalExample(source_text="repo-test-example", embedding=[0.0] * 1536)
+        user = await add_user(session, telegram_id=555002, display_name="repo-example")
+        example = ProposalExample(
+            user_id=user.id, source_text="repo-test-example", embedding=[0.0] * 1536
+        )
         session.add(example)
         await session.commit()
         await session.refresh(example)
 
-        examples = await list_proposal_examples(session)
+        examples = await list_proposal_examples(session, user.id)
         assert any(e.id == example.id for e in examples)
 
-        removed = await remove_proposal_example(session, example.id)
+        removed = await remove_proposal_example(session, example.id, user.id)
         assert removed is True
 
-        removed_again = await remove_proposal_example(session, example.id)
+        removed_again = await remove_proposal_example(session, example.id, user.id)
         assert removed_again is False
 
-        examples_after = await list_proposal_examples(session)
+        examples_after = await list_proposal_examples(session, user.id)
         assert all(e.id != example.id for e in examples_after)
+
+        await delete_user(session, telegram_id=555002)
+
+
+@pytest.mark.asyncio
+async def test_scheduling_setters_update_row():
+    from upwork_bot.db.repo import (
+        set_parsing_active,
+        set_quiet_hours_enabled,
+        set_quiet_window,
+        set_timezone,
+    )
+
+    async with AsyncSessionLocal() as session:
+        await add_user(session, telegram_id=558200, display_name="setters")
+    try:
+        async with AsyncSessionLocal() as session:
+            assert await set_timezone(session, 558200, "Europe/Kyiv") is True
+            assert await set_parsing_active(session, 558200, False) is True
+            assert await set_quiet_hours_enabled(session, 558200, True) is True
+            assert await set_quiet_window(session, 558200, _dt.time(23, 0), _dt.time(7, 0)) is True
+
+        async with AsyncSessionLocal() as session:
+            saved = await get_user_by_telegram_id(session, 558200)
+            assert saved.timezone == "Europe/Kyiv"
+            assert saved.parsing_active is False
+            assert saved.quiet_hours_enabled is True
+            assert saved.quiet_start == _dt.time(23, 0)
+            assert saved.quiet_end == _dt.time(7, 0)
+
+        # Unknown telegram_id returns False.
+        async with AsyncSessionLocal() as session:
+            assert await set_timezone(session, 111, "UTC") is False
+    finally:
+        async with AsyncSessionLocal() as session:
+            await delete_user(session, telegram_id=558200)

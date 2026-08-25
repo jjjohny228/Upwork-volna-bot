@@ -5,11 +5,17 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from upwork_bot.bot.handlers import (
     jobs,
+    mailboxes,
     menu,
     portfolio,
     proposal_examples,
     proposals,
+    qualify_prompt,
+    quiet_hours,
     resume,
+    setup,
+    timezone,
+    user_settings,
 )
 from upwork_bot.bot.middlewares.registered_user import RegisteredUserMiddleware
 from upwork_bot.config import get_settings
@@ -26,6 +32,12 @@ def create_dispatcher() -> Dispatcher:
     dispatcher.include_router(resume.router)
     dispatcher.include_router(portfolio.router)
     dispatcher.include_router(proposal_examples.router)
+    dispatcher.include_router(mailboxes.router)
+    dispatcher.include_router(qualify_prompt.router)
+    dispatcher.include_router(user_settings.router)
+    dispatcher.include_router(timezone.router)
+    dispatcher.include_router(quiet_hours.router)
+    dispatcher.include_router(setup.router)
     dispatcher.include_router(jobs.router)
     dispatcher.include_router(proposals.router)
     dispatcher.include_router(menu.router)
