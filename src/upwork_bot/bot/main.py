@@ -13,6 +13,7 @@ from upwork_bot.bot.handlers import (
     qualify_prompt,
     resume,
     setup,
+    timezone,
     user_settings,
 )
 from upwork_bot.bot.middlewares.registered_user import RegisteredUserMiddleware
@@ -33,6 +34,7 @@ def create_dispatcher() -> Dispatcher:
     dispatcher.include_router(mailboxes.router)
     dispatcher.include_router(qualify_prompt.router)
     dispatcher.include_router(user_settings.router)
+    dispatcher.include_router(timezone.router)
     dispatcher.include_router(setup.router)
     dispatcher.include_router(jobs.router)
     dispatcher.include_router(proposals.router)
