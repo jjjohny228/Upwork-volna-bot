@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     LargeBinary,
     Text,
+    Time,
     UniqueConstraint,
     func,
 )
@@ -32,6 +33,15 @@ class User(Base):
     notify_qualified_only: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
+    # Per-user parsing schedule. `parsing_active` is the manual start/pause switch;
+    # quiet hours suspend parsing during a daily local-time window (needs timezone).
+    parsing_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    timezone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quiet_hours_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    quiet_start: Mapped[time | None] = mapped_column(Time, nullable=True)
+    quiet_end: Mapped[time | None] = mapped_column(Time, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
