@@ -89,9 +89,14 @@ SQLAlchemy 2.0 (async, asyncpg) · Alembic · Postgres + [pgvector](https://gith
 4. Run the bot:
 
    ```bash
-   uv run python -m upwork_bot.app          # local
+   uv run python -m upwork_bot.app          # local (run the migrations in step 3 first)
    docker compose up -d --build             # full stack (bot + db)
    ```
+
+   > The full-stack `docker compose` path applies pending migrations automatically:
+   > the bot container's entrypoint runs `alembic upgrade head` before launching, so
+   > a fresh server is one command (`docker compose up -d --build`) with no manual
+   > migrate step. The `uv run alembic upgrade head` in step 3 is only for local runs.
 
 <!-- SCREENSHOT: terminal showing the bot starting up ("Poll cycle complete, N new jobs").
      Capture your local `uv run python -m upwork_bot.app` output and save as
