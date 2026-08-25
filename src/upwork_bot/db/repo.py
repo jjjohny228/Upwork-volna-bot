@@ -1,3 +1,4 @@
+from datetime import time
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
@@ -117,6 +118,43 @@ async def set_analysis_prompt(session: AsyncSession, telegram_id: int, prompt: s
     if user is None:
         return False
     user.analysis_prompt = prompt
+    await session.commit()
+    return True
+
+
+async def set_timezone(session: AsyncSession, telegram_id: int, tz: str) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.timezone = tz
+    await session.commit()
+    return True
+
+
+async def set_parsing_active(session: AsyncSession, telegram_id: int, active: bool) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.parsing_active = active
+    await session.commit()
+    return True
+
+
+async def set_quiet_hours_enabled(session: AsyncSession, telegram_id: int, enabled: bool) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.quiet_hours_enabled = enabled
+    await session.commit()
+    return True
+
+
+async def set_quiet_window(session: AsyncSession, telegram_id: int, start: time, end: time) -> bool:
+    user = await get_user_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    user.quiet_start = start
+    user.quiet_end = end
     await session.commit()
     return True
 

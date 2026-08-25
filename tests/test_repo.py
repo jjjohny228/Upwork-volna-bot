@@ -1,3 +1,5 @@
+import datetime as _dt
+
 import pytest
 from sqlalchemy import select
 
@@ -162,3 +164,37 @@ async def test_list_and_remove_proposal_example():
         assert all(e.id != example.id for e in examples_after)
 
         await delete_user(session, telegram_id=555002)
+
+
+@pytest.mark.asyncio
+async def test_scheduling_setters_update_row():
+    from upwork_bot.db.repo import (
+        set_parsing_active,
+        set_quiet_hours_enabled,
+        set_quiet_window,
+        set_timezone,
+    )
+
+    async with AsyncSessionLocal() as session:
+        await add_user(session, telegram_id=558200, display_name="setters")
+    try:
+        async with AsyncSessionLocal() as session:
+            assert await set_timezone(session, 558200, "Europe/Kyiv") is True
+            assert await set_parsing_active(session, 558200, False) is True
+            assert await set_quiet_hours_enabled(session, 558200, True) is True
+            assert await set_quiet_window(session, 558200, _dt.time(23, 0), _dt.time(7, 0)) is True
+
+        async with AsyncSessionLocal() as session:
+            saved = await get_user_by_telegram_id(session, 558200)
+            assert saved.timezone == "Europe/Kyiv"
+            assert saved.parsing_active is False
+            assert saved.quiet_hours_enabled is True
+            assert saved.quiet_start == _dt.time(23, 0)
+            assert saved.quiet_end == _dt.time(7, 0)
+
+        # Unknown telegram_id returns False.
+        async with AsyncSessionLocal() as session:
+            assert await set_timezone(session, 111, "UTC") is False
+    finally:
+        async with AsyncSessionLocal() as session:
+            await delete_user(session, telegram_id=558200)
