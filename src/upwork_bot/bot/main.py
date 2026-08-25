@@ -11,6 +11,7 @@ from upwork_bot.bot.handlers import (
     proposal_examples,
     proposals,
     qualify_prompt,
+    quiet_hours,
     resume,
     setup,
     timezone,
@@ -35,6 +36,7 @@ def create_dispatcher() -> Dispatcher:
     dispatcher.include_router(qualify_prompt.router)
     dispatcher.include_router(user_settings.router)
     dispatcher.include_router(timezone.router)
+    dispatcher.include_router(quiet_hours.router)
     dispatcher.include_router(setup.router)
     dispatcher.include_router(jobs.router)
     dispatcher.include_router(proposals.router)
