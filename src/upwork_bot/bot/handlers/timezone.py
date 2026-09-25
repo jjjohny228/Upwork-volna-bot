@@ -13,6 +13,7 @@ from upwork_bot.bot.keyboards import (
     timezone_inline_kb,
 )
 from upwork_bot.bot.states import TimezoneStates
+from upwork_bot.config import is_admin
 from upwork_bot.db.base import AsyncSessionLocal
 from upwork_bot.db.models import User
 from upwork_bot.db.repo import set_timezone
@@ -49,7 +50,7 @@ async def pick_timezone(callback: CallbackQuery, user: User) -> None:
     user.timezone = name
     await callback.message.answer(
         f"✅ Timezone set to <b>{name}</b>.",
-        reply_markup=settings_menu_kb(user.notify_qualified_only),
+        reply_markup=settings_menu_kb(user.notify_qualified_only, is_admin(user.telegram_id)),
     )
     await callback.answer()
 
@@ -69,7 +70,8 @@ async def process_manual_timezone(message: Message, state: FSMContext, user: Use
     if message.text in (BTN_BACK, BTN_CANCEL):
         await state.clear()
         await message.answer(
-            "Cancelled.", reply_markup=settings_menu_kb(user.notify_qualified_only)
+            "Cancelled.",
+            reply_markup=settings_menu_kb(user.notify_qualified_only, is_admin(user.telegram_id)),
         )
         return
 
@@ -84,5 +86,5 @@ async def process_manual_timezone(message: Message, state: FSMContext, user: Use
     await state.clear()
     await message.answer(
         f"✅ Timezone set to <b>{name}</b>.",
-        reply_markup=settings_menu_kb(user.notify_qualified_only),
+        reply_markup=settings_menu_kb(user.notify_qualified_only, is_admin(user.telegram_id)),
     )

@@ -45,3 +45,8 @@ class TimezoneStates(StatesGroup):
 class QuietHoursStates(StatesGroup):
     waiting_for_start = State()
     waiting_for_end = State()
+
+
+class RestoreDbStates(StatesGroup):
+    waiting_for_dump = State()
+    waiting_for_confirmation = State()

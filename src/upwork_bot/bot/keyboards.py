@@ -46,6 +46,10 @@ BTN_PAUSE_PARSING = "⏸ Pause parsing"
 BTN_QUIET_HOURS = "🌙 Quiet hours"
 BTN_TIMEZONE = "🕒 Timezone"
 
+BTN_BACKUP_DB = "🗄 Backup DB"
+BTN_RESTORE_DB = "♻️ Restore DB"
+BTN_CONFIRM_RESTORE = "⚠️ Confirm restore"
+
 BTN_QUIET_TOGGLE_ON = "🔔 Enable quiet hours"
 BTN_QUIET_TOGGLE_OFF = "🔕 Disable quiet hours"
 BTN_QUIET_SET_WINDOW = "🕐 Set window"
@@ -82,21 +86,21 @@ def main_menu_kb(parsing_active: bool = True) -> ReplyKeyboardMarkup:
     )
 
 
-def settings_menu_kb(notify_qualified_only: bool) -> ReplyKeyboardMarkup:
+def settings_menu_kb(notify_qualified_only: bool, is_admin: bool = False) -> ReplyKeyboardMarkup:
     """Settings hub: per-user config sections + delivery-mode picker (dot = active)."""
     all_label = BTN_DELIVERY_ALL + ("" if notify_qualified_only else "  •")
     qualified_label = BTN_DELIVERY_QUALIFIED + ("  •" if notify_qualified_only else "")
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=BTN_MAILBOXES), KeyboardButton(text=BTN_QUALIFY_PROMPT)],
-            [KeyboardButton(text=BTN_HOURLY_RATE), KeyboardButton(text=BTN_SIGNATURE)],
-            [KeyboardButton(text=BTN_QUIET_HOURS), KeyboardButton(text=BTN_TIMEZONE)],
-            [KeyboardButton(text=all_label)],
-            [KeyboardButton(text=qualified_label)],
-            [KeyboardButton(text=BTN_BACK)],
-        ],
-        resize_keyboard=True,
-    )
+    keyboard = [
+        [KeyboardButton(text=BTN_MAILBOXES), KeyboardButton(text=BTN_QUALIFY_PROMPT)],
+        [KeyboardButton(text=BTN_HOURLY_RATE), KeyboardButton(text=BTN_SIGNATURE)],
+        [KeyboardButton(text=BTN_QUIET_HOURS), KeyboardButton(text=BTN_TIMEZONE)],
+        [KeyboardButton(text=all_label)],
+        [KeyboardButton(text=qualified_label)],
+    ]
+    if is_admin:
+        keyboard.append([KeyboardButton(text=BTN_BACKUP_DB), KeyboardButton(text=BTN_RESTORE_DB)])
+    keyboard.append([KeyboardButton(text=BTN_BACK)])
+    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 
 def quiet_hours_menu_kb(enabled: bool) -> ReplyKeyboardMarkup:
@@ -164,6 +168,13 @@ def examples_menu_kb() -> ReplyKeyboardMarkup:
 
 def cancel_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=BTN_CANCEL)]], resize_keyboard=True)
+
+
+def confirm_restore_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=BTN_CONFIRM_RESTORE)], [KeyboardButton(text=BTN_CANCEL)]],
+        resize_keyboard=True,
+    )
 
 
 def delete_button_kb(prefix: str, item_id: int) -> InlineKeyboardMarkup:

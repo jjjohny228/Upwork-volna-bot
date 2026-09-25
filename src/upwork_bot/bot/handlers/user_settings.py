@@ -11,6 +11,7 @@ from upwork_bot.bot.keyboards import (
     settings_menu_kb,
 )
 from upwork_bot.bot.states import RateStates, SignatureStates
+from upwork_bot.config import is_admin
 from upwork_bot.db.base import AsyncSessionLocal
 from upwork_bot.db.models import User
 from upwork_bot.db.repo import set_hourly_rate, set_signature_name
@@ -33,7 +34,8 @@ async def process_rate(message: Message, state: FSMContext, user: User) -> None:
     if message.text in (BTN_BACK, BTN_CANCEL):
         await state.clear()
         await message.answer(
-            "Cancelled.", reply_markup=settings_menu_kb(user.notify_qualified_only)
+            "Cancelled.",
+            reply_markup=settings_menu_kb(user.notify_qualified_only, is_admin(user.telegram_id)),
         )
         return
 
@@ -49,7 +51,7 @@ async def process_rate(message: Message, state: FSMContext, user: User) -> None:
     await state.clear()
     await message.answer(
         f"Hourly rate set to {rate:g} USD/h.",
-        reply_markup=settings_menu_kb(user.notify_qualified_only),
+        reply_markup=settings_menu_kb(user.notify_qualified_only, is_admin(user.telegram_id)),
     )
 
 
@@ -68,7 +70,8 @@ async def process_signature(message: Message, state: FSMContext, user: User) -> 
     if message.text in (BTN_BACK, BTN_CANCEL):
         await state.clear()
         await message.answer(
-            "Cancelled.", reply_markup=settings_menu_kb(user.notify_qualified_only)
+            "Cancelled.",
+            reply_markup=settings_menu_kb(user.notify_qualified_only, is_admin(user.telegram_id)),
         )
         return
 
@@ -83,5 +86,5 @@ async def process_signature(message: Message, state: FSMContext, user: User) -> 
     await state.clear()
     await message.answer(
         f"Signature name set to {name}.",
-        reply_markup=settings_menu_kb(user.notify_qualified_only),
+        reply_markup=settings_menu_kb(user.notify_qualified_only, is_admin(user.telegram_id)),
     )

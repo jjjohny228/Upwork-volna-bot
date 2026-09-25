@@ -19,6 +19,7 @@ from upwork_bot.bot.keyboards import (
     resume_menu_kb,
     settings_menu_kb,
 )
+from upwork_bot.config import is_admin
 from upwork_bot.db.base import AsyncSessionLocal
 from upwork_bot.db.models import User
 from upwork_bot.db.repo import set_notify_qualified_only, set_parsing_active
@@ -63,7 +64,7 @@ async def open_settings_menu(message: Message, state: FSMContext, user: User) ->
     await state.clear()
     await message.answer(
         _delivery_status_line(user.notify_qualified_only),
-        reply_markup=settings_menu_kb(user.notify_qualified_only),
+        reply_markup=settings_menu_kb(user.notify_qualified_only, is_admin(user.telegram_id)),
     )
 
 
@@ -75,7 +76,7 @@ async def set_delivery_all(message: Message, state: FSMContext, user: User) -> N
     user.notify_qualified_only = False
     await message.answer(
         "✅ You'll now receive <b>all jobs</b> (disqualified ones arrive silently).",
-        reply_markup=settings_menu_kb(False),
+        reply_markup=settings_menu_kb(False, is_admin(user.telegram_id)),
     )
 
 
@@ -87,7 +88,7 @@ async def set_delivery_qualified(message: Message, state: FSMContext, user: User
     user.notify_qualified_only = True
     await message.answer(
         "✅ You'll now receive <b>only qualified jobs</b>.",
-        reply_markup=settings_menu_kb(True),
+        reply_markup=settings_menu_kb(True, is_admin(user.telegram_id)),
     )
 
 

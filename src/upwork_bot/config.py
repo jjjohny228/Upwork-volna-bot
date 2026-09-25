@@ -29,3 +29,7 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def is_admin(telegram_id: int) -> bool:
+    return telegram_id == get_settings().admin_telegram_id

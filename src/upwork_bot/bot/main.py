@@ -4,6 +4,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from upwork_bot.bot.handlers import (
+    backup,
     jobs,
     mailboxes,
     menu,
@@ -37,6 +38,7 @@ def create_dispatcher() -> Dispatcher:
     dispatcher.include_router(user_settings.router)
     dispatcher.include_router(timezone.router)
     dispatcher.include_router(quiet_hours.router)
+    dispatcher.include_router(backup.router)
     dispatcher.include_router(setup.router)
     dispatcher.include_router(jobs.router)
     dispatcher.include_router(proposals.router)
