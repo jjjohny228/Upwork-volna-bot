@@ -20,5 +20,6 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 COPY . .
+RUN chmod +x docker-entrypoint.sh
 
-CMD ["uv", "run", "python", "-m", "upwork_bot.app"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
