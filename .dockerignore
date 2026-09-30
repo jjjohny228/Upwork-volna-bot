@@ -10,3 +10,6 @@ tasks
 docs
 *.md
 .env*
+.venv
+__pycache__
+*.pyc
