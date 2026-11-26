@@ -3,6 +3,7 @@ import logging
 
 from dotenv import load_dotenv
 
+from upwork_bot.backup_scheduler import run_daily_backup
 from upwork_bot.bot.handlers.jobs import notify_new_job
 from upwork_bot.bot.main import create_bot, create_dispatcher
 from upwork_bot.config import get_settings
@@ -54,6 +55,7 @@ async def main() -> None:
     await asyncio.gather(
         dispatcher.start_polling(bot),
         run_forever(settings.poll_interval_seconds, on_new_job),
+        run_daily_backup(bot),
     )
 
 

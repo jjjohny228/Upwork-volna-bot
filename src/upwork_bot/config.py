@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,17 @@ class Settings(BaseSettings):
     # Vollna sender + IMAP host stay global (one Vollna, one Gmail IMAP host).
     vollna_sender: str = "info@vollna.com"
     gmail_imap_host: str = "imap.gmail.com"
+
+    # Daily DB backup: pg_dump sent as a document to every chat in
+    # BACKUP_CHAT_IDS (comma-separated Telegram ids). Empty → ADMIN_TELEGRAM_ID.
+    daily_backup_enabled: bool = True
+    backup_hour_utc: int = Field(default=3, ge=0, le=23)
+    backup_chat_ids: str = ""
+
+    @property
+    def backup_recipients(self) -> list[int]:
+        ids = [int(part) for part in self.backup_chat_ids.replace(" ", "").split(",") if part]
+        return ids or [self.admin_telegram_id]
 
     # DEPRECATED globals — now per-user (users.hourly_rate/signature_name and the
     # mailboxes table). Kept only so migration 0009 can seed the admin's first
